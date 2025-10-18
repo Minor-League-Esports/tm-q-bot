@@ -1,0 +1,28 @@
+[Unit]
+Description=Trackmania Scrim Queue Bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=tmscrim
+Group=tmscrim
+WorkingDirectory=/opt/tm-scrim-bot
+Environment="NODE_ENV=production"
+EnvironmentFile=/opt/tm-scrim-bot/.env
+ExecStart=/usr/bin/node /opt/tm-scrim-bot/dist/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tm-scrim-bot
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/tm-scrim-bot/logs
+
+[Install]
+WantedBy=multi-user.target
