@@ -4,9 +4,12 @@
   "description": "Discord bot for managing Trackmania scrim queues",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "npm run build && node --watch dist/index.js",
+    "dev:tsx": "tsx watch src/index.ts",
+    "dev:clean": "rm -rf dist && npm run dev",
     "build": "tsc",
     "start": "node dist/index.js",
+    "deploy-commands": "npm run build && node dist/scripts/deploy-commands.js",
     "test": "vitest",
     "test:ci": "vitest run",
     "lint": "eslint src --ext .ts",

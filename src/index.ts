@@ -17,6 +17,10 @@ async function main() {
   // Initialize bot
   const bot = new DiscordBot();
 
+  // Load commands
+  await bot.loadCommands();
+  logger.info('Commands loaded successfully');
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);
@@ -30,6 +34,9 @@ async function main() {
 
   // Start bot
   await bot.start();
+
+  // Initialize queue event handlers (after bot is logged in)
+  bot.initializeQueueEvents();
 
   logger.info(`Bot is running in ${config.app.nodeEnv} mode`);
 }

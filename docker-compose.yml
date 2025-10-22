@@ -30,7 +30,7 @@ services:
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - tm-scrim-network
     healthcheck:
