@@ -5,8 +5,12 @@ export class Database {
   private pool: Pool;
 
   constructor() {
+    const isLocal = config.database.url.includes('localhost') || config.database.url.includes('127.0.0.1');
     this.pool = new Pool({
       connectionString: config.database.url,
+      ssl: isLocal ? false : {
+        rejectUnauthorized: false,
+      },
     });
 
     this.pool.on('error', (err) => {

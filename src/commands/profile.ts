@@ -26,6 +26,26 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     // Get player from database
     const player = await playerService.getByDiscordId(discordId);
     if (!player) {
+      // If the user is checking their own profile, give them more info
+      if (discordId === interaction.user.id) {
+        // Check if they exist in Sprocket
+        const hasSprocketIdentity = await playerService.validateSprocketIdentity(discordId);
+
+        if (!hasSprocketIdentity) {
+          await interaction.reply({
+            content: `❌ You are not registered in the Sprocket system for Trackmania.\nPlease register on the website first, then contact an admin to be added to the bot.`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        await interaction.reply({
+          content: `✅ You have a valid Sprocket account, but are not yet registered in this bot.\nPlease contact an admin to complete your registration.`,
+          ephemeral: true,
+        });
+        return;
+      }
+
       await interaction.reply({
         content: `${targetUser.username} is not registered in the system.`,
         ephemeral: true,
@@ -89,8 +109,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         .slice(0, 5)
         .map(s => {
           const status = s.status === 'completed' ? '✅' :
-                        s.status === 'cancelled' ? '❌' :
-                        s.status === 'active' ? '🎮' : '⏳';
+            s.status === 'cancelled' ? '❌' :
+              s.status === 'active' ? '🎮' : '⏳';
           const date = new Date(s.created_at).toLocaleDateString();
           return `${status} ${s.scrim_uid} - ${date}`;
         })

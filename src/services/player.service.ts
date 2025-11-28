@@ -100,6 +100,33 @@ export class PlayerService {
       throw error;
     }
   }
+  /**
+   * Validate if a player exists in the Sprocket database for Trackmania
+   */
+  async validateSprocketIdentity(discordId: string): Promise<boolean> {
+    try {
+      const result = await db.query<{ id: number }>(
+        `
+        SELECT p.id
+        FROM sprocket.user_authentication_account uaa
+        JOIN sprocket.user u ON u.id = uaa."userId"
+        JOIN sprocket.member m ON m."userId" = u.id
+        JOIN sprocket.player p ON p."memberId" = m.id
+        JOIN sprocket.game_skill_group gsg ON gsg.id = p."skillGroupId"
+        JOIN sprocket.game g ON g.id = gsg."gameId"
+        WHERE uaa."accountType" = 'DISCORD'
+          AND uaa."accountId" = $1
+          AND g.title = 'Trackmania'
+        LIMIT 1
+        `,
+        [discordId]
+      );
+      return result.rows.length > 0;
+    } catch (error) {
+      logger.error('Error validating Sprocket identity:', { discordId, error });
+      throw error;
+    }
+  }
 }
 
 export const playerService = new PlayerService();

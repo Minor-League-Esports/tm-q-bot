@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { Map, MapWithPlayCount } from '../types.js';
+import { Map as ScrimMap, MapWithPlayCount } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 
@@ -7,9 +7,9 @@ export class MapService {
   /**
    * Get all active maps
    */
-  async getActiveMaps(): Promise<Map[]> {
+  async getActiveMaps(): Promise<ScrimMap[]> {
     try {
-      const result = await db.query<Map>(
+      const result = await db.query<ScrimMap>(
         'SELECT * FROM maps WHERE is_active = TRUE ORDER BY name'
       );
       return result.rows;
@@ -22,9 +22,9 @@ export class MapService {
   /**
    * Get a map by ID
    */
-  async getById(mapId: number): Promise<Map | null> {
+  async getById(mapId: number): Promise<ScrimMap | null> {
     try {
-      const result = await db.query<Map>(
+      const result = await db.query<ScrimMap>(
         'SELECT * FROM maps WHERE id = $1',
         [mapId]
       );
@@ -38,11 +38,11 @@ export class MapService {
   /**
    * Get maps by their IDs
    */
-  async getByIds(mapIds: number[]): Promise<Map[]> {
+  async getByIds(mapIds: number[]): Promise<ScrimMap[]> {
     if (mapIds.length === 0) return [];
 
     try {
-      const result = await db.query<Map>(
+      const result = await db.query<ScrimMap>(
         'SELECT * FROM maps WHERE id = ANY($1)',
         [mapIds]
       );
@@ -105,7 +105,7 @@ export class MapService {
   async selectMapsForScrim(
     playerIds: number[],
     count: number = 3
-  ): Promise<Map[]> {
+  ): Promise<ScrimMap[]> {
     try {
       const mapPlayCounts = await this.getMapPlayCounts(playerIds);
 
