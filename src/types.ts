@@ -139,3 +139,11 @@ export interface MapWithPlayCount {
   map: Map;
   playCount: number;
 }
+
+// Web App URL generation types
+export interface WebAppUrlData {
+  scrimId: string;
+  players: string[];
+  maps: string[];
+  timestamp: string;
+}

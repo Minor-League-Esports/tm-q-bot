@@ -1,5 +1,6 @@
 import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { QueuePopEvent, queueService } from '../services/queue.service.js';
+import { UrlGenerator } from '../utils/urlGenerator.js';
 import { logger } from '../utils/logger.js';
 
 export class QueueEventHandler {
@@ -41,32 +42,45 @@ export class QueueEventHandler {
       scrimId: scrim.id,
       scrimUid: scrim.scrim_uid,
       playerCount: players.length,
-      league: scrim.league
+      league: scrim.league,
     });
+
+    // Generate the Google AppScript Web App URL
+    const urlData = UrlGenerator.createUrlData(
+      scrim.scrim_uid,
+      players.map((p) => p.discord_username),
+      maps.map((m) => m.name),
+    );
+    const formUrl = UrlGenerator.generateWebAppUrl(urlData);
 
     // Create embed with scrim details
     const embed = new EmbedBuilder()
-      .setColor(0x00FF00)
+      .setColor(0x00ff00)
       .setTitle('🎮 Scrim Match Found!')
       .setDescription(`**${scrim.league} League** - Scrim ID: \`${scrim.scrim_uid}\``)
       .addFields(
         {
           name: '👥 Players',
-          value: players.map(p => `• ${p.discord_username}`).join('\n'),
-          inline: true
+          value: players.map((p) => `• ${p.discord_username}`).join('\n'),
+          inline: true,
         },
         {
           name: '🗺️ Maps',
           value: maps.map((m, i) => `${i + 1}. ${m.name}`).join('\n'),
-          inline: true
+          inline: true,
         },
         {
           name: '⏰ Check-in Deadline',
           value: scrim.checkin_deadline
             ? `<t:${Math.floor(new Date(scrim.checkin_deadline).getTime() / 1000)}:R>`
             : '5 minutes',
-          inline: false
-        }
+          inline: false,
+        },
+        {
+          name: '📝 Submit Results',
+          value: `[Click here to submit match results](${formUrl})`,
+          inline: false,
+        },
       )
       .setFooter({ text: 'Use /checkin to confirm your participation' })
       .setTimestamp();
@@ -77,19 +91,20 @@ export class QueueEventHandler {
         const user = await this.client.users.fetch(player.discord_id);
 
         await user.send({
-          content: '⚠️ **SCRIM MATCH FOUND** ⚠️\n\nYou have **5 minutes** to check in using `/checkin`',
-          embeds: [embed]
+          content:
+            '⚠️ **SCRIM MATCH FOUND** ⚠️\n\nYou have **5 minutes** to check in using `/checkin`',
+          embeds: [embed],
         });
 
         logger.info('Sent queue pop DM', {
           playerId: player.id,
-          discordId: player.discord_id
+          discordId: player.discord_id,
         });
       } catch (error) {
         logger.error('Failed to send queue pop DM', {
           playerId: player.id,
           discordId: player.discord_id,
-          error
+          error,
         });
       }
     }
@@ -111,7 +126,7 @@ export class QueueEventHandler {
     logger.info('Handling check-in timeout', {
       scrimId,
       noShowCount: noShowPlayerIds.length,
-      checkedInCount: checkedInPlayers.length
+      checkedInCount: checkedInPlayers.length,
     });
 
     // Notify no-show players about their penalty
@@ -131,20 +146,20 @@ export class QueueEventHandler {
           : 0;
 
         const embed = new EmbedBuilder()
-          .setColor(0xFF0000)
+          .setColor(0xff0000)
           .setTitle('❌ Queue Dodge Penalty')
           .setDescription('You failed to check in for your scrim match.')
           .addFields(
             {
               name: '⛔ Penalty',
               value: `Banned from queueing for **${banDuration} minutes**`,
-              inline: true
+              inline: true,
             },
             {
               name: '🔢 Recent Dodges',
               value: ban ? `${ban.dodge_count} in last 24h` : '1',
-              inline: true
-            }
+              inline: true,
+            },
           )
           .setFooter({ text: 'Please check in promptly when a match is found!' })
           .setTimestamp();
@@ -153,12 +168,12 @@ export class QueueEventHandler {
 
         logger.info('Sent dodge penalty notification', {
           playerId,
-          banDuration
+          banDuration,
         });
       } catch (error) {
         logger.error('Failed to send dodge penalty DM', {
           playerId,
-          error
+          error,
         });
       }
     }
@@ -173,27 +188,25 @@ export class QueueEventHandler {
         const user = await this.client.users.fetch(player.discord_id);
 
         const embed = new EmbedBuilder()
-          .setColor(0xFFA500)
+          .setColor(0xffa500)
           .setTitle('⚠️ Match Cancelled')
           .setDescription('Your scrim was cancelled because not all players checked in.')
-          .addFields(
-            {
-              name: '✅ You\'ve been returned to the queue',
-              value: 'You have priority and will be matched with the next available players.',
-              inline: false
-            }
-          )
+          .addFields({
+            name: "✅ You've been returned to the queue",
+            value: 'You have priority and will be matched with the next available players.',
+            inline: false,
+          })
           .setTimestamp();
 
         await user.send({ embeds: [embed] });
 
         logger.info('Sent match cancelled notification', {
-          playerId
+          playerId,
         });
       } catch (error) {
         logger.error('Failed to send match cancelled DM', {
           playerId,
-          error
+          error,
         });
       }
     }
@@ -351,7 +364,7 @@ export class QueueEventHandler {
       if (channel?.isTextBased()) {
         await (channel as TextChannel).send({
           content: `🎮 **${league} Scrim Match Found!**`,
-          embeds: [embed]
+          embeds: [embed],
         });
 
         logger.info('Posted to scrim channel', { league, channelId });

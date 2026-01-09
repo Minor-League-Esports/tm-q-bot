@@ -39,7 +39,10 @@ export class QueueService extends EventEmitter {
   /**
    * Add a player to a queue
    */
-  async joinQueue(discordId: string, _username: string): Promise<{
+  async joinQueue(
+    discordId: string,
+    _username: string,
+  ): Promise<{
     success: boolean;
     message: string;
     position?: number;
@@ -65,9 +68,19 @@ export class QueueService extends EventEmitter {
         };
       }
 
+      // Check for valid Sprocket identity
+      const isSprocketValid = await playerService.validateSprocketIdentity(player.discord_id);
+      if (!isSprocketValid) {
+        return {
+          success: false,
+          message:
+            'You must have a valid Player account in Sprocket for Trackmania to join the queue.',
+        };
+      }
+
       // Check if player is already in any queue
       for (const [league, entries] of Object.entries(this.queues)) {
-        if (entries.some(e => e.discordId === discordId)) {
+        if (entries.some((e) => e.discordId === discordId)) {
           return {
             success: false,
             message: `You are already in the ${league} queue.`,
@@ -88,7 +101,7 @@ export class QueueService extends EventEmitter {
       logger.info('Player joined queue', {
         playerId: player.id,
         league: player.league,
-        queueSize: queue.length
+        queueSize: queue.length,
       });
 
       // Check if queue is ready to pop (4 players)
@@ -120,7 +133,7 @@ export class QueueService extends EventEmitter {
     try {
       // Find and remove player from any queue
       for (const [league, entries] of Object.entries(this.queues)) {
-        const index = entries.findIndex(e => e.discordId === discordId);
+        const index = entries.findIndex((e) => e.discordId === discordId);
         if (index !== -1) {
           entries.splice(index, 1);
           logger.info('Player left queue', { discordId, league, queueSize: entries.length });
@@ -167,7 +180,7 @@ export class QueueService extends EventEmitter {
    */
   isPlayerInQueue(discordId: string): { inQueue: boolean; league?: League; position?: number } {
     for (const [league, entries] of Object.entries(this.queues)) {
-      const index = entries.findIndex(e => e.discordId === discordId);
+      const index = entries.findIndex((e) => e.discordId === discordId);
       if (index !== -1) {
         return {
           inQueue: true,
@@ -188,14 +201,14 @@ export class QueueService extends EventEmitter {
       if (queue.length < 4) {
         logger.warn('Attempted to pop queue with less than 4 players', {
           league,
-          queueSize: queue.length
+          queueSize: queue.length,
         });
         return;
       }
 
       // Take first 4 players
       const queuedPlayers = queue.splice(0, 4);
-      const playerIds = queuedPlayers.map(p => p.playerId);
+      const playerIds = queuedPlayers.map((p) => p.playerId);
 
       // Get full player objects
       const players = await playerService.getByIds(playerIds);
@@ -211,7 +224,7 @@ export class QueueService extends EventEmitter {
         scrimId: scrim.id,
         scrimUid: scrim.scrim_uid,
         playerIds,
-        mapIds: maps.map(m => m.id)
+        mapIds: maps.map((m) => m.id),
       });
 
       // Emit event for Discord notifications
@@ -252,7 +265,7 @@ export class QueueService extends EventEmitter {
 
           logger.info('Check-in timeout expired', {
             scrimId,
-            noShowCount: noShowPlayerIds.length
+            noShowCount: noShowPlayerIds.length,
           });
 
           // Apply dodge penalties to no-shows
@@ -266,8 +279,8 @@ export class QueueService extends EventEmitter {
           // Get checked-in players and return them to queue
           const scrimPlayers = await scrimService.getScrimPlayers(scrimId);
           const checkedInPlayers = scrimPlayers
-            .filter(sp => sp.checked_in)
-            .map(sp => sp.player_id);
+            .filter((sp) => sp.checked_in)
+            .map((sp) => sp.player_id);
 
           if (checkedInPlayers.length > 0) {
             const players = await playerService.getByIds(checkedInPlayers);
@@ -305,7 +318,7 @@ export class QueueService extends EventEmitter {
     queue.unshift(entry);
     logger.info('Player returned to queue with priority', {
       playerId: player.id,
-      league: player.league
+      league: player.league,
     });
   }
 

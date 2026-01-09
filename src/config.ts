@@ -22,6 +22,9 @@ interface Config {
     dodgeBan3: number;
     dodgeWindow: number;
   };
+  appScript: {
+    baseUrl: string;
+  };
   app: {
     nodeEnv: string;
     port: number;
@@ -70,6 +73,9 @@ export const config: Config = {
     dodgeBan2: getEnvNumber('DODGE_BAN_2', 1800),
     dodgeBan3: getEnvNumber('DODGE_BAN_3', 7200),
     dodgeWindow: getEnvNumber('DODGE_WINDOW', 86400),
+  },
+  appScript: {
+    baseUrl: getEnvVar('APPSCRIPT_BASE_URL'),
   },
   app: {
     nodeEnv: getEnvVar('NODE_ENV', 'development'),
