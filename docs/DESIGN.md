@@ -87,20 +87,19 @@ For each scrim:
 
 ### 4. Match Result Submission
 
-#### Google Form Integration
-- Pre-existing Google Form with replay file upload
-- Bot generates pre-filled form link with URL parameters:
-  - Scrim ID (pre-filled via URL parameter)
-  - Player names (pre-filled via URL parameter)
-  - Date/time (pre-filled via URL parameter)
-- No Google Forms API needed - uses standard URL prefill syntax
-- Form link sent to players when scrim starts
+#### Google Apps Script Integration
+- Deployed Apps Script web app handles replay upload and verification
+- Bot generates web app link with URL parameters:
+  - Scrim ID via `id`
+  - Player names
+  - Date/time
+- No separate form-prefill flow
+- Web app link sent to players when scrim starts
 
 #### Data Processing
-- Manual or automated processing by other developer
-- Form responses collected in Google Sheets
+- Apps Script receives replay uploads and verification actions
+- Parser writes match stats and eligibility outcomes to the database
 - Bot tracks scrim creation and player participation
-- Future: Parse replay files and update stats automatically
 
 ### 5. Admin Commands
 
@@ -267,8 +266,8 @@ DODGE_BAN_2=1800      # 30 minutes
 DODGE_BAN_3=7200      # 2 hours
 DODGE_WINDOW=86400    # 24 hours
 
-# Google Forms
-GOOGLE_FORM_BASE_URL=https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform
+# Google Apps Script
+APPSCRIPT_BASE_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 
 # Deployment
 PORT=3000
@@ -287,12 +286,11 @@ NODE_ENV=production
 - Batch database queries
 - Pre-compute least-played maps periodically
 
-### Form Generation
-- Use Google Forms URL prefill parameters (no API needed)
-- Format: `BASE_URL?entry.123456=value&entry.789012=value2`
-- Pre-fill scrim ID, player names, and timestamp
-- Generate unique form link per scrim
-- Example: `https://docs.google.com/forms/.../viewform?entry.123=SCRIM-ABC-123&entry.456=Player1,Player2,Player3,Player4`
+### Web App Generation
+- Use the Google Apps Script web app URL
+- Format: `BASE_URL?id=SCRIM-ABC-123&players=Player1,Player2,...`
+- Pass scrim ID, player names, maps, and timestamp as query params
+- Generate unique web app link per scrim
 
 ### Match Data Processing (Future Enhancement)
 - Initially: Manual processing via Google Sheets

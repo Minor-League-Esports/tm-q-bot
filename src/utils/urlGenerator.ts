@@ -12,8 +12,8 @@ export class UrlGenerator {
     const baseUrl = config.appScript.baseUrl;
     const params = new URLSearchParams();
 
-    // Add scrim ID
-    params.append('scrimId', data.scrimId);
+    // The Apps Script web app routes on ?id=<scrim_uid>
+    params.append('id', data.scrimId);
 
     // Add player names (comma-separated)
     params.append('players', data.players.join(','));

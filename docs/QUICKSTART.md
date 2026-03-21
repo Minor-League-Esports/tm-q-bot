@@ -178,7 +178,7 @@ In your Discord server, try these commands:
 1. Set up the database for full functionality
 2. Register test players in the database
 3. Test the full queue → pop → checkin flow
-4. Configure Google Forms integration for match results
+4. Configure Google Apps Script web app integration for match results
 
 ## Development Commands
 

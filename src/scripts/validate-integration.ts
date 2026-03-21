@@ -41,7 +41,7 @@ async function getExistingBotTables(requiredTables: string[]) {
 async function main() {
   dotenvConfig();
   if (!process.env.APPSCRIPT_BASE_URL) {
-    process.env.APPSCRIPT_BASE_URL = process.env.GOOGLE_FORM_BASE_URL || 'http://localhost';
+    process.env.APPSCRIPT_BASE_URL = 'http://localhost';
   }
 
   const { sprocketService } = await import('../services/sprocket.service.js');

@@ -8,7 +8,7 @@ A Discord bot for managing competitive Trackmania scrims on the MLE server. Hand
 - **Smart map selection** - Selects 3 maps based on least-played history across all players
 - **Check-in system** - 5-minute check-in window with automatic dodge penalties
 - **Ban management** - Escalating penalties for queue dodging
-- **Google Forms integration** - Pre-filled form links for match result submission
+- **Google Apps Script integration** - Web app links for replay submission and verification
 
 ## Prerequisites
 
@@ -37,7 +37,8 @@ Required configuration:
 - `DISCORD_GUILD_ID` - Your Discord server ID
 - `DISCORD_CLIENT_ID` - Your Discord application client ID
 - `DATABASE_URL` - PostgreSQL connection string
-- `GOOGLE_FORM_BASE_URL` - Your Google Form URL
+- `DATABASE_SCHEMA` - Bot schema name, normally `trackmania`
+- `APPSCRIPT_BASE_URL` - Deployed Google Apps Script web app URL ending in `/exec`
 
 ### 3. Set Up Database
 
@@ -186,24 +187,21 @@ All configuration is done via environment variables. See `.env.example` for all 
 - `DODGE_BAN_1/2/3` - Escalating dodge penalties in seconds
 - `LEAGUES` - Comma-separated list of league names
 
-## Google Forms Setup
+## Apps Script Setup
 
-The bot generates pre-filled Google Form links for match results:
+The bot generates Google Apps Script web app links for match results.
 
-1. Create a Google Form with fields for:
-   - Scrim ID
-   - Player names
-   - Maps played
-   - Timestamp
-   - Replay file upload
+Use the deployed Apps Script web app URL as:
 
-2. Find the entry IDs by inspecting the form HTML
+```env
+APPSCRIPT_BASE_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+```
 
-3. Add the entry IDs to your `.env` file:
-   - `GOOGLE_FORM_SCRIM_ID_ENTRY`
-   - `GOOGLE_FORM_PLAYERS_ENTRY`
-   - `GOOGLE_FORM_TIMESTAMP_ENTRY`
-   - `GOOGLE_FORM_MAPS_ENTRY`
+The bot links players to:
+- `...?id=<SCRIM_UID>` for scrim upload/verification routing
+- additional query params for player names, maps, and timestamp
+
+Legacy Google Form environment variables are obsolete and should not be used.
 
 ## License
 
