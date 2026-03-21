@@ -1,3 +1,6 @@
+CREATE SCHEMA IF NOT EXISTS trackmania;
+SET search_path TO trackmania, public;
+
 -- Elo Ratings
 CREATE TABLE IF NOT EXISTS elo_ratings (
   id SERIAL PRIMARY KEY,

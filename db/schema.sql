@@ -1,5 +1,8 @@
 -- Trackmania Scrim Bot Database Schema
 
+CREATE SCHEMA IF NOT EXISTS trackmania;
+SET search_path TO trackmania, public;
+
 -- Players table
 CREATE TABLE IF NOT EXISTS players (
   id SERIAL PRIMARY KEY,
@@ -59,6 +62,8 @@ CREATE TABLE IF NOT EXISTS scrims (
   scrim_uid VARCHAR(36) UNIQUE NOT NULL,
   league VARCHAR(50) NOT NULL CHECK (league IN ('Academy', 'Champion', 'Master')),
   status VARCHAR(20) NOT NULL CHECK (status IN ('checking_in', 'active', 'completed', 'cancelled')),
+  sprocket_match_parent_id INTEGER UNIQUE,
+  sprocket_match_id INTEGER UNIQUE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   checkin_deadline TIMESTAMP,
   completed_at TIMESTAMP

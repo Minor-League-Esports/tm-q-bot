@@ -10,6 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "deploy-commands": "npm run build && node dist/scripts/deploy-commands.js",
+    "validate:integration": "tsx src/scripts/validate-integration.ts",
     "test": "vitest",
     "test:ci": "vitest run",
     "lint": "eslint src --ext .ts",

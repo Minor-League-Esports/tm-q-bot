@@ -10,6 +10,7 @@ interface Config {
   };
   database: {
     url: string;
+    schema: string;
   };
   queue: {
     checkInTimeout: number;
@@ -59,6 +60,7 @@ export const config: Config = {
   },
   database: {
     url: getEnvVar('DATABASE_URL'),
+    schema: getEnvVar('DATABASE_SCHEMA', 'trackmania'),
   },
   queue: {
     checkInTimeout: getEnvNumber('QUEUE_CHECK_IN_TIMEOUT', 300),

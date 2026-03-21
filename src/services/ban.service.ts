@@ -1,9 +1,11 @@
-import { db } from '../db/index.js';
+import { db, tableName } from '../db/index.js';
 import { QueueBan } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 
 export class BanService {
+  private readonly queueBansTable = tableName('queue_bans');
+
   /**
    * Check if a player is currently banned
    */
@@ -11,7 +13,7 @@ export class BanService {
     try {
       const result = await db.query<{ exists: boolean }>(
         `SELECT EXISTS(
-          SELECT 1 FROM queue_bans
+          SELECT 1 FROM ${this.queueBansTable}
           WHERE player_id = $1
           AND ban_end > NOW()
         )`,
@@ -30,7 +32,7 @@ export class BanService {
   async getActiveBan(playerId: number): Promise<QueueBan | null> {
     try {
       const result = await db.query<QueueBan>(
-        `SELECT * FROM queue_bans
+        `SELECT * FROM ${this.queueBansTable}
          WHERE player_id = $1
          AND ban_end > NOW()
          ORDER BY ban_end DESC
@@ -50,7 +52,7 @@ export class BanService {
   async getRecentDodgeCount(playerId: number): Promise<number> {
     try {
       const result = await db.query<{ count: string }>(
-        `SELECT COUNT(*) as count FROM queue_bans
+        `SELECT COUNT(*) as count FROM ${this.queueBansTable}
          WHERE player_id = $1
          AND is_manual = FALSE
          AND ban_start > NOW() - INTERVAL '1 day'`,
@@ -90,7 +92,7 @@ export class BanService {
       const banEnd = new Date(banStart.getTime() + banDuration * 1000);
 
       const result = await db.query<QueueBan>(
-        `INSERT INTO queue_bans (player_id, ban_start, ban_end, reason, dodge_count, is_manual)
+        `INSERT INTO ${this.queueBansTable} (player_id, ban_start, ban_end, reason, dodge_count, is_manual)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [
@@ -131,7 +133,7 @@ export class BanService {
       const banEnd = new Date(banStart.getTime() + durationSeconds * 1000);
 
       const result = await db.query<QueueBan>(
-        `INSERT INTO queue_bans (player_id, ban_start, ban_end, reason, dodge_count, is_manual)
+        `INSERT INTO ${this.queueBansTable} (player_id, ban_start, ban_end, reason, dodge_count, is_manual)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
         [playerId, banStart, banEnd, reason, 0, true]
@@ -158,7 +160,7 @@ export class BanService {
   async unbanPlayer(playerId: number): Promise<void> {
     try {
       await db.query(
-        `UPDATE queue_bans
+        `UPDATE ${this.queueBansTable}
          SET ban_end = NOW()
          WHERE player_id = $1
          AND ban_end > NOW()`,
@@ -177,7 +179,7 @@ export class BanService {
   async getPlayerBanHistory(playerId: number, limit = 10): Promise<QueueBan[]> {
     try {
       const result = await db.query<QueueBan>(
-        `SELECT * FROM queue_bans
+        `SELECT * FROM ${this.queueBansTable}
          WHERE player_id = $1
          ORDER BY ban_start DESC
          LIMIT $2`,

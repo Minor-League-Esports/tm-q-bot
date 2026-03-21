@@ -1,8 +1,14 @@
-import { db } from '../db/index.js';
-import { Scrim, ScrimResult, EloRating, League } from '../types.js';
+import { db, tableName } from '../db/index.js';
+import { Scrim, EloRating, League } from '../types.js';
 import { logger } from '../utils/logger.js';
 
 export class EloService {
+    private readonly scrimsTable = tableName('scrims');
+    private readonly scrimPlayersTable = tableName('scrim_players');
+    private readonly matchPlayerStatsTable = tableName('match_player_stats');
+    private readonly eloRatingsTable = tableName('elo_ratings');
+    private readonly eloHistoryTable = tableName('elo_history');
+
     /**
      * Calculate new rating (Stub)
      * Replace this with your actual Elo formula
@@ -24,7 +30,7 @@ export class EloService {
 
             // 1. Fetch match details
             const scrimResult = await client.query<Scrim>(
-                'SELECT * FROM scrims WHERE id = $1',
+                `SELECT * FROM ${this.scrimsTable} WHERE id = $1`,
                 [scrimId]
             );
             const scrim = scrimResult.rows[0];
@@ -47,8 +53,8 @@ export class EloService {
             // We need to join with match_player_stats to get the team_id
             const playersResult = await client.query<{ player_id: number; team_id: number }>(
                 `SELECT sp.player_id, mps.team_id 
-         FROM scrim_players sp
-         LEFT JOIN match_player_stats mps ON sp.player_id = mps.player_id AND mps.scrim_id = sp.scrim_id
+         FROM ${this.scrimPlayersTable} sp
+         LEFT JOIN ${this.matchPlayerStatsTable} mps ON sp.player_id = mps.player_id AND mps.scrim_id = sp.scrim_id
          WHERE sp.scrim_id = $1
          GROUP BY sp.player_id, mps.team_id`, // Group to avoid duplicates if multiple maps
                 [scrimId]
@@ -60,7 +66,7 @@ export class EloService {
             const ratings = new Map<number, EloRating>();
             for (const p of players) {
                 const ratingResult = await client.query<EloRating>(
-                    'SELECT * FROM elo_ratings WHERE player_id = $1 AND league = $2',
+                    `SELECT * FROM ${this.eloRatingsTable} WHERE player_id = $1 AND league = $2`,
                     [p.player_id, scrim.league]
                 );
 
@@ -119,7 +125,7 @@ export class EloService {
 
             // 5. Mark scrim as processed
             await client.query(
-                'UPDATE scrims SET elo_processed = TRUE WHERE id = $1',
+                `UPDATE ${this.scrimsTable} SET elo_processed = TRUE WHERE id = $1`,
                 [scrimId]
             );
 
@@ -146,13 +152,13 @@ export class EloService {
     ) {
         // Upsert Elo Rating
         await client.query(
-            `INSERT INTO elo_ratings (player_id, league, rating, wins, losses, updated_at)
+            `INSERT INTO ${this.eloRatingsTable} (player_id, league, rating, wins, losses, updated_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (player_id, league) 
        DO UPDATE SET 
          rating = $3,
-         wins = elo_ratings.wins + $6,
-         losses = elo_ratings.losses + $7,
+         wins = ${this.eloRatingsTable}.wins + $6,
+         losses = ${this.eloRatingsTable}.losses + $7,
          updated_at = NOW()`,
             [
                 playerId,
@@ -167,7 +173,7 @@ export class EloService {
 
         // Insert History
         await client.query(
-            `INSERT INTO elo_history (player_id, scrim_id, old_rating, new_rating)
+            `INSERT INTO ${this.eloHistoryTable} (player_id, scrim_id, old_rating, new_rating)
        VALUES ($1, $2, $3, $4)`,
             [playerId, scrimId, currentRating.rating, newRating]
         );

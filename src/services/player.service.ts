@@ -1,15 +1,18 @@
-import { db } from '../db/index.js';
+import { db, tableName } from '../db/index.js';
 import { Player, League } from '../types.js';
 import { logger } from '../utils/logger.js';
+import { sprocketService } from './sprocket.service.js';
 
 export class PlayerService {
+  private readonly playersTable = tableName('players');
+
   /**
    * Get a player by Discord ID
    */
   async getByDiscordId(discordId: string): Promise<Player | null> {
     try {
       const result = await db.query<Player>(
-        'SELECT * FROM players WHERE discord_id = $1',
+        `SELECT * FROM ${this.playersTable} WHERE discord_id = $1`,
         [discordId]
       );
       return result.rows[0] || null;
@@ -25,7 +28,7 @@ export class PlayerService {
   async getById(id: number): Promise<Player | null> {
     try {
       const result = await db.query<Player>(
-        'SELECT * FROM players WHERE id = $1',
+        `SELECT * FROM ${this.playersTable} WHERE id = $1`,
         [id]
       );
       return result.rows[0] || null;
@@ -43,7 +46,7 @@ export class PlayerService {
 
     try {
       const result = await db.query<Player>(
-        'SELECT * FROM players WHERE id = ANY($1)',
+        `SELECT * FROM ${this.playersTable} WHERE id = ANY($1)`,
         [ids]
       );
       return result.rows;
@@ -59,7 +62,7 @@ export class PlayerService {
   async exists(discordId: string): Promise<boolean> {
     try {
       const result = await db.query<{ exists: boolean }>(
-        'SELECT EXISTS(SELECT 1 FROM players WHERE discord_id = $1)',
+        `SELECT EXISTS(SELECT 1 FROM ${this.playersTable} WHERE discord_id = $1)`,
         [discordId]
       );
       return result.rows[0]?.exists || false;
@@ -75,7 +78,7 @@ export class PlayerService {
   async getByLeague(league: League): Promise<Player[]> {
     try {
       const result = await db.query<Player>(
-        'SELECT * FROM players WHERE league = $1',
+        `SELECT * FROM ${this.playersTable} WHERE league = $1`,
         [league]
       );
       return result.rows;
@@ -91,7 +94,7 @@ export class PlayerService {
   async updateLeague(playerId: number, league: League): Promise<void> {
     try {
       await db.query(
-        'UPDATE players SET league = $1, updated_at = NOW() WHERE id = $2',
+        `UPDATE ${this.playersTable} SET league = $1, updated_at = NOW() WHERE id = $2`,
         [league, playerId]
       );
       logger.info('Player league updated', { playerId, league });
@@ -105,25 +108,63 @@ export class PlayerService {
    */
   async validateSprocketIdentity(discordId: string): Promise<boolean> {
     try {
-      const result = await db.query<{ id: number }>(
-        `
-        SELECT p.id
-        FROM sprocket.user_authentication_account uaa
-        JOIN sprocket.user u ON u.id = uaa."userId"
-        JOIN sprocket.member m ON m."userId" = u.id
-        JOIN sprocket.player p ON p."memberId" = m.id
-        JOIN sprocket.game_skill_group gsg ON gsg.id = p."skillGroupId"
-        JOIN sprocket.game g ON g.id = gsg."gameId"
-        WHERE uaa."accountType" = 'DISCORD'
-          AND uaa."accountId" = $1
-          AND g.title = 'Trackmania'
-        LIMIT 1
-        `,
-        [discordId]
-      );
-      return result.rows.length > 0;
+      const profile = await sprocketService.getTrackmaniaProfileByDiscordId(discordId);
+      return profile !== null;
     } catch (error) {
       logger.error('Error validating Sprocket identity:', { discordId, error });
+      throw error;
+    }
+  }
+
+  async syncPlayerFromSprocket(discordId: string, discordUsername: string): Promise<Player | null> {
+    const profile = await sprocketService.getTrackmaniaProfileByDiscordId(discordId);
+    if (!profile) {
+      return null;
+    }
+
+    const league = sprocketService.deriveLeague({
+      code: profile.skill_group_code,
+      description: profile.skill_group_name,
+    });
+
+    if (!league) {
+      logger.warn('Unable to derive league from Sprocket skill group', {
+        discordId,
+        skillGroupId: profile.skill_group_id,
+        skillGroupCode: profile.skill_group_code,
+        skillGroupName: profile.skill_group_name,
+      });
+      return null;
+    }
+
+    try {
+      const existing = await this.getByDiscordId(discordId);
+      if (existing) {
+        const result = await db.query<Player>(
+          `UPDATE ${this.playersTable}
+           SET discord_username = $2,
+               league = $3,
+               updated_at = NOW()
+           WHERE discord_id = $1
+           RETURNING *`,
+          [discordId, discordUsername, league],
+        );
+        return result.rows[0] || existing;
+      }
+
+      const result = await db.query<Player>(
+        `INSERT INTO ${this.playersTable} (discord_id, discord_username, league)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [discordId, discordUsername, league],
+      );
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error syncing player from Sprocket:', {
+        discordId,
+        discordUsername,
+        error,
+      });
       throw error;
     }
   }

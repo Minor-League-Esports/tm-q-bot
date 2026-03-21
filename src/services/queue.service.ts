@@ -48,12 +48,12 @@ export class QueueService extends EventEmitter {
     position?: number;
   }> {
     try {
-      // Check if player exists in database
-      const player = await playerService.getByDiscordId(discordId);
+      const player = await playerService.syncPlayerFromSprocket(discordId, _username);
       if (!player) {
         return {
           success: false,
-          message: 'You must be registered to join the queue. Please contact an admin.',
+          message:
+            'You must have a valid Sprocket Trackmania profile with a supported skill group to join the queue.',
         };
       }
 
@@ -65,16 +65,6 @@ export class QueueService extends EventEmitter {
         return {
           success: false,
           message: `You are banned from queueing for ${minutes} more minute(s).`,
-        };
-      }
-
-      // Check for valid Sprocket identity
-      const isSprocketValid = await playerService.validateSprocketIdentity(player.discord_id);
-      if (!isSprocketValid) {
-        return {
-          success: false,
-          message:
-            'You must have a valid Player account in Sprocket for Trackmania to join the queue.',
         };
       }
 

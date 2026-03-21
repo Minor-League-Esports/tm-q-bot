@@ -9,3 +9,7 @@ if (process.env.TEST_DATABASE_URL) {
 } else {
     console.warn('TEST_DATABASE_URL is not defined in environment variables');
 }
+
+if (!process.env.DATABASE_SCHEMA) {
+    process.env.DATABASE_SCHEMA = 'public';
+}

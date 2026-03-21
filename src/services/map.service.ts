@@ -1,16 +1,19 @@
-import { db } from '../db/index.js';
+import { db, tableName } from '../db/index.js';
 import { Map as ScrimMap, MapWithPlayCount } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 
 export class MapService {
+  private readonly mapsTable = tableName('maps');
+  private readonly mapPlayHistoryTable = tableName('map_play_history');
+
   /**
    * Get all active maps
    */
   async getActiveMaps(): Promise<ScrimMap[]> {
     try {
       const result = await db.query<ScrimMap>(
-        'SELECT * FROM maps WHERE is_active = TRUE ORDER BY name'
+        `SELECT * FROM ${this.mapsTable} WHERE is_active = TRUE ORDER BY name`
       );
       return result.rows;
     } catch (error) {
@@ -25,7 +28,7 @@ export class MapService {
   async getById(mapId: number): Promise<ScrimMap | null> {
     try {
       const result = await db.query<ScrimMap>(
-        'SELECT * FROM maps WHERE id = $1',
+        `SELECT * FROM ${this.mapsTable} WHERE id = $1`,
         [mapId]
       );
       return result.rows[0] || null;
@@ -43,7 +46,7 @@ export class MapService {
 
     try {
       const result = await db.query<ScrimMap>(
-        'SELECT * FROM maps WHERE id = ANY($1)',
+        `SELECT * FROM ${this.mapsTable} WHERE id = ANY($1)`,
         [mapIds]
       );
       return result.rows;
@@ -70,8 +73,8 @@ export class MapService {
         `SELECT
            m.id as map_id,
            COALESCE(COUNT(mph.id), 0) as play_count
-         FROM maps m
-         LEFT JOIN map_play_history mph ON m.id = mph.map_id
+         FROM ${this.mapsTable} m
+         LEFT JOIN ${this.mapPlayHistoryTable} mph ON m.id = mph.map_id
            AND mph.player_id = ANY($1)
            AND mph.played_at > NOW() - INTERVAL '1 day' * $2
          WHERE m.is_active = TRUE
@@ -154,7 +157,7 @@ export class MapService {
   async recordMapPlay(playerId: number, mapId: number): Promise<void> {
     try {
       await db.query(
-        `INSERT INTO map_play_history (player_id, map_id, played_at)
+        `INSERT INTO ${this.mapPlayHistoryTable} (player_id, map_id, played_at)
          VALUES ($1, $2, NOW())`,
         [playerId, mapId]
       );
@@ -178,7 +181,7 @@ export class MapService {
       for (const playerId of playerIds) {
         for (const mapId of mapIds) {
           await client.query(
-            `INSERT INTO map_play_history (player_id, map_id, played_at)
+            `INSERT INTO ${this.mapPlayHistoryTable} (player_id, map_id, played_at)
              VALUES ($1, $2, NOW())`,
             [playerId, mapId]
           );

@@ -1,10 +1,15 @@
-import { db } from '../db/index.js';
+import { db, tableName } from '../db/index.js';
 import { Scrim, ScrimPlayer, ScrimMap, League, Map, Player } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 import { randomUUID } from 'crypto';
+import { sprocketService } from './sprocket.service.js';
 
 export class ScrimService {
+  private readonly scrimsTable = tableName('scrims');
+  private readonly scrimPlayersTable = tableName('scrim_players');
+  private readonly scrimMapsTable = tableName('scrim_maps');
+
   /**
    * Create a new scrim
    */
@@ -24,13 +29,22 @@ export class ScrimService {
       // Generate unique scrim ID
       const scrimUid = this.generateScrimId();
       const checkinDeadline = new Date(Date.now() + config.queue.checkInTimeout * 1000);
+      const sprocketMatch = await sprocketService.createMatchParentAndMatch(client, league, scrimUid);
 
       // Create scrim
       const scrimResult = await client.query<Scrim>(
-        `INSERT INTO scrims (scrim_uid, league, status, match_type, created_at, checkin_deadline)
-         VALUES ($1, $2, $3, 'QUEUE', NOW(), $4)
+        `INSERT INTO ${this.scrimsTable}
+         (scrim_uid, league, status, match_type, created_at, checkin_deadline, sprocket_match_parent_id, sprocket_match_id)
+         VALUES ($1, $2, $3, 'QUEUE', NOW(), $4, $5, $6)
          RETURNING *`,
-        [scrimUid, league, 'checking_in', checkinDeadline]
+        [
+          scrimUid,
+          league,
+          'checking_in',
+          checkinDeadline,
+          sprocketMatch.matchParentId,
+          sprocketMatch.matchId,
+        ]
       );
 
       const scrim = scrimResult.rows[0];
@@ -38,7 +52,7 @@ export class ScrimService {
       // Add players to scrim
       for (const playerId of playerIds) {
         await client.query(
-          `INSERT INTO scrim_players (scrim_id, player_id, checked_in)
+          `INSERT INTO ${this.scrimPlayersTable} (scrim_id, player_id, checked_in)
            VALUES ($1, $2, FALSE)`,
           [scrim.id, playerId]
         );
@@ -47,7 +61,7 @@ export class ScrimService {
       // Add maps to scrim
       for (let i = 0; i < maps.length; i++) {
         await client.query(
-          `INSERT INTO scrim_maps (scrim_id, map_id, map_order)
+          `INSERT INTO ${this.scrimMapsTable} (scrim_id, map_id, map_order)
            VALUES ($1, $2, $3)`,
           [scrim.id, maps[i].id, i + 1]
         );
@@ -90,13 +104,15 @@ export class ScrimService {
 
       // Generate unique scrim ID
       const scrimUid = this.generateScrimId();
+      const sprocketMatch = await sprocketService.createMatchParentAndMatch(client, league, scrimUid);
 
       // Create scrim with SCHEDULED type and ACTIVE status (no check-in needed)
       const scrimResult = await client.query<Scrim>(
-        `INSERT INTO scrims (scrim_uid, league, status, match_type, created_at)
-         VALUES ($1, $2, 'active', 'SCHEDULED', NOW())
+        `INSERT INTO ${this.scrimsTable}
+         (scrim_uid, league, status, match_type, created_at, sprocket_match_parent_id, sprocket_match_id)
+         VALUES ($1, $2, 'active', 'SCHEDULED', NOW(), $3, $4)
          RETURNING *`,
-        [scrimUid, league]
+        [scrimUid, league, sprocketMatch.matchParentId, sprocketMatch.matchId]
       );
 
       const scrim = scrimResult.rows[0];
@@ -104,7 +120,7 @@ export class ScrimService {
       // Add players to scrim (auto checked-in)
       for (const player of players) {
         await client.query(
-          `INSERT INTO scrim_players (scrim_id, player_id, checked_in, checkin_at)
+          `INSERT INTO ${this.scrimPlayersTable} (scrim_id, player_id, checked_in, checkin_at)
            VALUES ($1, $2, TRUE, NOW())`,
           [scrim.id, player.id]
         );
@@ -135,7 +151,7 @@ export class ScrimService {
   async getById(scrimId: number): Promise<Scrim | null> {
     try {
       const result = await db.query<Scrim>(
-        'SELECT * FROM scrims WHERE id = $1',
+        `SELECT * FROM ${this.scrimsTable} WHERE id = $1`,
         [scrimId]
       );
       return result.rows[0] || null;
@@ -151,7 +167,7 @@ export class ScrimService {
   async getByUid(scrimUid: string): Promise<Scrim | null> {
     try {
       const result = await db.query<Scrim>(
-        'SELECT * FROM scrims WHERE scrim_uid = $1',
+        `SELECT * FROM ${this.scrimsTable} WHERE scrim_uid = $1`,
         [scrimUid]
       );
       return result.rows[0] || null;
@@ -167,7 +183,7 @@ export class ScrimService {
   async getScrimPlayers(scrimId: number): Promise<ScrimPlayer[]> {
     try {
       const result = await db.query<ScrimPlayer>(
-        'SELECT * FROM scrim_players WHERE scrim_id = $1',
+        `SELECT * FROM ${this.scrimPlayersTable} WHERE scrim_id = $1`,
         [scrimId]
       );
       return result.rows;
@@ -183,7 +199,7 @@ export class ScrimService {
   async getScrimMaps(scrimId: number): Promise<ScrimMap[]> {
     try {
       const result = await db.query<ScrimMap>(
-        'SELECT * FROM scrim_maps WHERE scrim_id = $1 ORDER BY map_order',
+        `SELECT * FROM ${this.scrimMapsTable} WHERE scrim_id = $1 ORDER BY map_order`,
         [scrimId]
       );
       return result.rows;
@@ -199,7 +215,7 @@ export class ScrimService {
   async checkInPlayer(scrimId: number, playerId: number): Promise<boolean> {
     try {
       const result = await db.query(
-        `UPDATE scrim_players
+        `UPDATE ${this.scrimPlayersTable}
          SET checked_in = TRUE, checkin_at = NOW()
          WHERE scrim_id = $1 AND player_id = $2
          RETURNING *`,
@@ -233,7 +249,7 @@ export class ScrimService {
     try {
       const result = await db.query<{ all_checked_in: boolean }>(
         `SELECT NOT EXISTS(
-           SELECT 1 FROM scrim_players
+           SELECT 1 FROM ${this.scrimPlayersTable}
            WHERE scrim_id = $1 AND checked_in = FALSE
          ) as all_checked_in`,
         [scrimId]
@@ -251,7 +267,7 @@ export class ScrimService {
   async activateScrim(scrimId: number): Promise<void> {
     try {
       await db.query(
-        `UPDATE scrims
+        `UPDATE ${this.scrimsTable}
          SET status = 'active'
          WHERE id = $1`,
         [scrimId]
@@ -269,7 +285,7 @@ export class ScrimService {
   async cancelScrim(scrimId: number): Promise<void> {
     try {
       await db.query(
-        `UPDATE scrims
+        `UPDATE ${this.scrimsTable}
          SET status = 'cancelled', completed_at = NOW()
          WHERE id = $1`,
         [scrimId]
@@ -287,7 +303,7 @@ export class ScrimService {
   async completeScrim(scrimId: number): Promise<void> {
     try {
       await db.query(
-        `UPDATE scrims
+        `UPDATE ${this.scrimsTable}
          SET status = 'completed', completed_at = NOW()
          WHERE id = $1`,
         [scrimId]
@@ -305,7 +321,7 @@ export class ScrimService {
   async getNoShowPlayers(scrimId: number): Promise<number[]> {
     try {
       const result = await db.query<{ player_id: number }>(
-        `SELECT player_id FROM scrim_players
+        `SELECT player_id FROM ${this.scrimPlayersTable}
          WHERE scrim_id = $1 AND checked_in = FALSE`,
         [scrimId]
       );
@@ -346,7 +362,7 @@ export class ScrimService {
   async getActiveScrimsByLeague(league: League): Promise<Scrim[]> {
     try {
       const result = await db.query<Scrim>(
-        `SELECT * FROM scrims
+        `SELECT * FROM ${this.scrimsTable}
          WHERE league = $1
          AND status IN ('checking_in', 'active')
          ORDER BY created_at DESC`,
@@ -365,8 +381,8 @@ export class ScrimService {
   async getPlayerRecentScrims(playerId: number, limit = 10): Promise<Scrim[]> {
     try {
       const result = await db.query<Scrim>(
-        `SELECT s.* FROM scrims s
-         JOIN scrim_players sp ON s.id = sp.scrim_id
+        `SELECT s.* FROM ${this.scrimsTable} s
+         JOIN ${this.scrimPlayersTable} sp ON s.id = sp.scrim_id
          WHERE sp.player_id = $1
          ORDER BY s.created_at DESC
          LIMIT $2`,

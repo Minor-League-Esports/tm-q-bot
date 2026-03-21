@@ -1,6 +1,17 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg';
 import { config } from '../config.js';
 
+function quoteIdentifier(identifier: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error(`Invalid SQL identifier: ${identifier}`);
+  }
+  return `"${identifier}"`;
+}
+
+export function tableName(table: string): string {
+  return `${quoteIdentifier(config.database.schema)}.${quoteIdentifier(table)}`;
+}
+
 export class Database {
   private pool: Pool;
 

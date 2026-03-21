@@ -49,6 +49,8 @@ export interface Scrim {
   league: League;
   status: ScrimStatus;
   match_type: MatchType;
+  sprocket_match_parent_id: number | null;
+  sprocket_match_id: number | null;
   winner_team: number | null;
   elo_processed: boolean;
   created_at: Date;
