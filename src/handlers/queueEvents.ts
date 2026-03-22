@@ -2,6 +2,7 @@ import { Client, EmbedBuilder, TextChannel } from 'discord.js';
 import { QueuePopEvent, queueService } from '../services/queue.service.js';
 import { UrlGenerator } from '../utils/urlGenerator.js';
 import { logger } from '../utils/logger.js';
+import { buildCheckInActionRow, buildQueuePopPrompt } from './checkinInteractions.js';
 
 export class QueueEventHandler {
   constructor(private client: Client) {
@@ -72,7 +73,7 @@ export class QueueEventHandler {
           inline: false,
         },
       )
-      .setFooter({ text: 'Use /checkin to confirm your participation' })
+      .setFooter({ text: 'Use the Check in button to confirm your participation' })
       .setTimestamp();
 
     // Send DM to each player
@@ -81,9 +82,9 @@ export class QueueEventHandler {
         const user = await this.client.users.fetch(player.discord_id);
 
         await user.send({
-          content:
-            '⚠️ **SCRIM MATCH FOUND** ⚠️\n\nYou have **5 minutes** to check in using `/checkin`',
+          content: buildQueuePopPrompt(),
           embeds: [embed],
+          components: [buildCheckInActionRow()],
         });
 
         logger.info('Sent queue pop DM', {
@@ -219,8 +220,13 @@ export class QueueEventHandler {
 
       if (channel?.isTextBased()) {
         await (channel as TextChannel).send({
-          content: `🎮 **${league} Scrim Match Found!**`,
+          content: [
+            `🎮 **${league} Scrim Match Found!**`,
+            '',
+            'Use the **Check in now** button below to confirm your spot here.',
+          ].join('\n'),
           embeds: [embed],
+          components: [buildCheckInActionRow()],
         });
 
         logger.info('Posted to scrim channel', { league, channelId });

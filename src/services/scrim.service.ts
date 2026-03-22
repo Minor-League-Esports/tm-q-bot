@@ -1,9 +1,30 @@
 import { db, tableName } from '../db/index.js';
-import { Scrim, ScrimPlayer, ScrimMap, League, Map, Player } from '../types.js';
+import { Scrim, ScrimPlayer, ScrimMap, League, Map, Player, MatchType, ScrimStatus } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config.js';
 import { randomUUID } from 'crypto';
 import { sprocketService } from './sprocket.service.js';
+import { UrlGenerator } from '../utils/urlGenerator.js';
+
+export interface AdminScrimDetail {
+  scrim: Scrim;
+  players: Array<Player & { checked_in: boolean; checkin_at: Date | null }>;
+  maps: Map[];
+  checkedInCount: number;
+  submissionUrl: string;
+}
+
+interface AdminScrimPlayerRow extends Player {
+  checked_in: boolean;
+  checkin_at: Date | null;
+}
+
+interface AdminScrimQueryOptions {
+  league?: League;
+  matchType?: MatchType;
+  statuses?: ScrimStatus[];
+  limit?: number;
+}
 
 export class ScrimService {
   private readonly scrimsTable = tableName('scrims');
@@ -393,6 +414,146 @@ export class ScrimService {
       logger.error('Error getting player recent scrims:', { playerId, error });
       throw error;
     }
+  }
+
+  /**
+   * Get a detailed snapshot for a single scrim
+   */
+  async getAdminScrimDetail(scrimId: number): Promise<AdminScrimDetail | null> {
+    try {
+      const scrim = await this.getById(scrimId);
+      if (!scrim) {
+        return null;
+      }
+
+      const playersResult = await db.query<AdminScrimPlayerRow>(
+        `SELECT
+           p.id,
+           p.discord_id,
+           p.discord_username,
+           p.league,
+           p.created_at,
+           p.updated_at,
+           sp.checked_in,
+           sp.checkin_at
+         FROM ${this.scrimPlayersTable} sp
+         JOIN ${tableName('players')} p ON p.id = sp.player_id
+         WHERE sp.scrim_id = $1
+         ORDER BY sp.id`,
+        [scrimId]
+      );
+
+      const mapsResult = await db.query<Map>(
+        `SELECT
+           m.id,
+           m.name,
+           m.uid,
+           m.author,
+           m.is_active,
+           m.created_at
+         FROM ${this.scrimMapsTable} sm
+         JOIN ${tableName('maps')} m ON m.id = sm.map_id
+         WHERE sm.scrim_id = $1
+         ORDER BY sm.map_order`,
+        [scrimId]
+      );
+
+      const players = playersResult.rows;
+      const maps = mapsResult.rows;
+      const submissionUrl = UrlGenerator.generateWebAppUrl(
+        UrlGenerator.createUrlData(
+          scrim.scrim_uid,
+          players.map((player) => player.discord_username),
+          maps.map((map) => map.name),
+          scrim.created_at
+        )
+      );
+
+      return {
+        scrim,
+        players,
+        maps,
+        checkedInCount: players.filter((player) => player.checked_in).length,
+        submissionUrl,
+      };
+    } catch (error) {
+      logger.error('Error getting admin scrim detail:', { scrimId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get admin-friendly scrim details for the requested filters
+   */
+  async getAdminScrimDetails(options: AdminScrimQueryOptions): Promise<AdminScrimDetail[]> {
+    try {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      if (options.league) {
+        params.push(options.league);
+        conditions.push(`league = $${params.length}`);
+      }
+
+      if (options.matchType) {
+        params.push(options.matchType);
+        conditions.push(`match_type = $${params.length}`);
+      }
+
+      if (options.statuses && options.statuses.length > 0) {
+        params.push(options.statuses);
+        conditions.push(`status = ANY($${params.length})`);
+      }
+
+      const limit = Math.max(1, Math.min(options.limit ?? 10, 25));
+      params.push(limit);
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const result = await db.query<Scrim>(
+        `SELECT *
+         FROM ${this.scrimsTable}
+         ${whereClause}
+         ORDER BY created_at DESC
+         LIMIT $${params.length}`,
+        params
+      );
+
+      const details: AdminScrimDetail[] = [];
+      for (const scrim of result.rows) {
+        const detail = await this.getAdminScrimDetail(scrim.id);
+        if (detail) {
+          details.push(detail);
+        }
+      }
+
+      return details;
+    } catch (error) {
+      logger.error('Error getting admin scrim details:', { options, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue scrims that are checking in or active
+   */
+  async getLiveAdminScrims(league?: League, limit = 10): Promise<AdminScrimDetail[]> {
+    return this.getAdminScrimDetails({
+      league,
+      matchType: 'QUEUE',
+      statuses: ['checking_in', 'active'],
+      limit,
+    });
+  }
+
+  /**
+   * Get scheduled matches
+   */
+  async getScheduledAdminMatches(league?: League, limit = 10): Promise<AdminScrimDetail[]> {
+    return this.getAdminScrimDetails({
+      league,
+      matchType: 'SCHEDULED',
+      limit,
+    });
   }
 }
 

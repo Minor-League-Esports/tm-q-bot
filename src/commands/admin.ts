@@ -7,6 +7,8 @@ import {
 import { queueService } from '../services/queue.service.js';
 import { banService } from '../services/ban.service.js';
 import { playerService } from '../services/player.service.js';
+import { scrimService } from '../services/scrim.service.js';
+import { eloService } from '../services/elo.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
 
@@ -119,37 +121,120 @@ export const data = new SlashCommandBuilder()
           .setDescription('The Scrim ID (UUID) to calculate Elo for')
           .setRequired(true)
       )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('cancel-scrim')
+      .setDescription('Cancel a queue scrim and return eligible players to the queue')
+      .addStringOption(option =>
+        option
+          .setName('scrim_id')
+          .setDescription('The Scrim ID (UUID) to cancel')
+          .setRequired(true)
+      )
+  )
+  .addSubcommandGroup(group =>
+    group
+      .setName('state')
+      .setDescription('Inspect current scrim state')
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('summary')
+          .setDescription('Show live and scheduled scrims at a glance')
+          .addStringOption(option =>
+            option
+              .setName('league')
+              .setDescription('Limit results to a league')
+              .setRequired(false)
+              .addChoices(
+                { name: 'All', value: 'All' },
+                { name: 'Academy', value: 'Academy' },
+                { name: 'Champion', value: 'Champion' },
+                { name: 'Master', value: 'Master' }
+              )
+          )
+      )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('live')
+          .setDescription('Show checking-in and active queue scrims')
+          .addStringOption(option =>
+            option
+              .setName('league')
+              .setDescription('Limit results to a league')
+              .setRequired(false)
+              .addChoices(
+                { name: 'All', value: 'All' },
+                { name: 'Academy', value: 'Academy' },
+                { name: 'Champion', value: 'Champion' },
+                { name: 'Master', value: 'Master' }
+              )
+          )
+      )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('scheduled')
+          .setDescription('Show scheduled matches')
+          .addStringOption(option =>
+            option
+              .setName('league')
+              .setDescription('Limit results to a league')
+              .setRequired(false)
+              .addChoices(
+                { name: 'All', value: 'All' },
+                { name: 'Academy', value: 'Academy' },
+                { name: 'Champion', value: 'Champion' },
+                { name: 'Master', value: 'Master' }
+              )
+          )
+      )
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
+  const subcommandGroup = interaction.options.getSubcommandGroup(false);
   const subcommand = interaction.options.getSubcommand();
 
   try {
-    switch (subcommand) {
-      case 'queue-reset':
-        await handleQueueReset(interaction);
+    switch (subcommandGroup) {
+      case 'state':
+        await handleStateCommand(interaction, subcommand);
         break;
-      case 'ban':
-        await handleBan(interaction);
-        break;
-      case 'unban':
-        await handleUnban(interaction);
-        break;
-      case 'stats':
-        await handleStats(interaction);
-        break;
-      case 'dodges':
-        await handleDodges(interaction);
-        break;
-      case 'create-match':
-        await handleCreateMatch(interaction);
-        break;
-      case 'calc-elo':
-        await handleCalcElo(interaction);
+      case null:
+        switch (subcommand) {
+          case 'queue-reset':
+            await handleQueueReset(interaction);
+            break;
+          case 'ban':
+            await handleBan(interaction);
+            break;
+          case 'unban':
+            await handleUnban(interaction);
+            break;
+          case 'stats':
+            await handleStats(interaction);
+            break;
+          case 'dodges':
+            await handleDodges(interaction);
+            break;
+          case 'create-match':
+            await handleCreateMatch(interaction);
+            break;
+          case 'calc-elo':
+            await handleCalcElo(interaction);
+            break;
+          case 'cancel-scrim':
+            await handleCancelScrim(interaction);
+            break;
+          default:
+            await interaction.reply({
+              content: 'Unknown subcommand.',
+              ephemeral: true,
+            });
+        }
         break;
       default:
         await interaction.reply({
-          content: 'Unknown subcommand.',
+          content: 'Unknown subcommand group.',
           ephemeral: true,
         });
     }
@@ -341,8 +426,150 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-import { scrimService } from '../services/scrim.service.js';
-import { eloService } from '../services/elo.service';
+async function handleStateCommand(
+  interaction: ChatInputCommandInteraction,
+  subcommand: string
+) {
+  const leagueOption = interaction.options.getString('league') as League | 'All' | null;
+  const league = leagueOption && leagueOption !== 'All' ? (leagueOption as League) : undefined;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  switch (subcommand) {
+    case 'summary': {
+      const liveScrims = await scrimService.getLiveAdminScrims(league, 3);
+      const scheduledMatches = await scrimService.getScheduledAdminMatches(league, 3);
+      const embed = buildStateSummaryEmbed(leagueOption ?? 'All', liveScrims, scheduledMatches);
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+    case 'live': {
+      const liveScrims = await scrimService.getLiveAdminScrims(league, 10);
+      const embed = buildStateDetailEmbed(
+        'Live Scrims',
+        leagueOption ?? 'All',
+        liveScrims,
+        'No live scrims are currently checking in or active.'
+      );
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+    case 'scheduled': {
+      const scheduledMatches = await scrimService.getScheduledAdminMatches(league, 10);
+      const embed = buildStateDetailEmbed(
+        'Scheduled Matches',
+        leagueOption ?? 'All',
+        scheduledMatches,
+        'No scheduled matches are currently queued.'
+      );
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+    default:
+      await interaction.editReply({
+        content: 'Unknown state subcommand.',
+      });
+  }
+}
+
+function buildStateSummaryEmbed(
+  league: League | 'All',
+  liveScrims: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>,
+  scheduledMatches: Awaited<ReturnType<typeof scrimService.getScheduledAdminMatches>>
+) {
+  const embed = new EmbedBuilder()
+    .setColor(0x0099ff)
+    .setTitle(`Admin State Summary${league === 'All' ? '' : ` - ${league}`}`)
+    .setDescription(
+      `Live: ${liveScrims.length} | Scheduled: ${scheduledMatches.length}`
+    );
+
+  embed.addFields(
+    {
+      name: 'Live Scrims',
+      value: liveScrims.length > 0 ? liveScrims.map(formatAdminScrimLine).join('\n\n') : 'None',
+      inline: false,
+    },
+    {
+      name: 'Scheduled Matches',
+      value:
+        scheduledMatches.length > 0
+          ? scheduledMatches.map(formatAdminScrimLine).join('\n\n')
+          : 'None',
+      inline: false,
+    }
+  );
+
+  return embed.setTimestamp();
+}
+
+function buildStateDetailEmbed(
+  title: string,
+  league: League | 'All',
+  details: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>,
+  emptyMessage: string
+) {
+  const embed = new EmbedBuilder()
+    .setColor(0x00aa55)
+    .setTitle(`Admin State: ${title}${league === 'All' ? '' : ` - ${league}`}`)
+    .setDescription(details.length > 0 ? `${details.length} scrim(s) found.` : emptyMessage);
+
+  if (details.length > 0) {
+    for (const detail of details) {
+      embed.addFields({
+        name: detail.scrim.scrim_uid,
+        value: formatAdminScrimDetail(detail),
+        inline: false,
+      });
+    }
+  }
+
+  return embed.setTimestamp();
+}
+
+function formatAdminScrimLine(detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number]) {
+  const statusLine = `${detail.scrim.match_type} / ${detail.scrim.status}`;
+  const playerNames = detail.players.map((player) => player.discord_username).join(', ');
+  const mapNames = detail.maps.length > 0 ? detail.maps.map((map) => map.name).join(', ') : 'None';
+  const matchIds = [
+    `parent ${detail.scrim.sprocket_match_parent_id ?? 'n/a'}`,
+    `match ${detail.scrim.sprocket_match_id ?? 'n/a'}`,
+  ].join(' | ');
+
+  return [
+    `ID: ${detail.scrim.scrim_uid}`,
+    `League: ${detail.scrim.league} | ${statusLine}`,
+    `Players: ${playerNames}`,
+    `Maps: ${mapNames}`,
+    `Match IDs: ${matchIds}`,
+    `Submit: ${detail.submissionUrl}`,
+  ].join('\n');
+}
+
+function formatAdminScrimDetail(detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number]) {
+  const checkedIn = `${detail.checkedInCount}/${detail.players.length} checked in`;
+  const checkInDeadline =
+    detail.scrim.checkin_deadline && detail.scrim.status === 'checking_in'
+      ? `<t:${Math.floor(new Date(detail.scrim.checkin_deadline).getTime() / 1000)}:R>`
+      : null;
+  const mapNames = detail.maps.length > 0 ? detail.maps.map((map) => map.name).join(', ') : 'None';
+  const playerNames = detail.players.map((player) => player.discord_username).join(', ');
+  const matchIds = [
+    `parent ${detail.scrim.sprocket_match_parent_id ?? 'n/a'}`,
+    `match ${detail.scrim.sprocket_match_id ?? 'n/a'}`,
+  ].join(' | ');
+  const lines = [
+    `League: ${detail.scrim.league}`,
+    `Status: ${detail.scrim.match_type} / ${detail.scrim.status}`,
+    `Players: ${playerNames}`,
+    `Maps: ${mapNames}`,
+    `Progress: ${checkedIn}${checkInDeadline ? ` | closes ${checkInDeadline}` : ''}`,
+    `Match IDs: ${matchIds}`,
+    `Submit: ${detail.submissionUrl}`,
+  ];
+
+  return lines.join('\n');
+}
 
 async function handleCreateMatch(interaction: ChatInputCommandInteraction) {
   const league = interaction.options.getString('league', true) as League;
@@ -434,5 +661,34 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
         ephemeral: true
       });
     }
+  }
+}
+
+async function handleCancelScrim(interaction: ChatInputCommandInteraction) {
+  const scrimUid = interaction.options.getString('scrim_id', true);
+
+  try {
+    const scrim = await scrimService.getByUid(scrimUid);
+
+    if (!scrim) {
+      await interaction.reply({
+        content: `❌ Scrim with ID \`${scrimUid}\` not found.`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const result = await queueService.cancelQueueScrim(scrim.id);
+
+    await interaction.reply({
+      content: result.success ? `✅ ${result.message}` : `❌ ${result.message}`,
+      ephemeral: !result.success,
+    });
+  } catch (error) {
+    logger.error('Error cancelling scrim:', error);
+    await interaction.reply({
+      content: '❌ An error occurred while cancelling the scrim.',
+      ephemeral: true,
+    });
   }
 }
