@@ -38,7 +38,9 @@ DATABASE_SCHEMA=trackmania
 APPSCRIPT_BASE_URL=https://script.google.com/macros/s/.../exec
 ```
 
-Useful behavior settings:
+The Google Apps Script source for the replay submission flow now lives in `parser/` in this repo. Deploy that folder as your Apps Script project, then set `APPSCRIPT_BASE_URL` to the deployed web app URL.
+
+## Step 5: Install Dependencies
 
 ```env
 QUEUE_CHECK_IN_TIMEOUT=300

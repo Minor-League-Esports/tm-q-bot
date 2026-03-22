@@ -32,11 +32,83 @@ If you are administering the bot, the most useful pages are:
 
 ## Requirements
 
-- Node.js 20+
-- PostgreSQL 16+
-- Discord bot token, client ID, and guild ID
-- A deployed Google Apps Script web app for result submission
-- A Trackmania profile in Sprocket for queue participation
+```
+tm-scrim-bot/
+├── src/
+│   ├── commands/         # Discord slash commands
+│   ├── services/         # Business logic
+│   ├── db/              # Database utilities
+│   ├── utils/           # Helper functions
+│   ├── types.ts         # TypeScript types
+│   ├── config.ts        # Configuration
+│   ├── bot.ts           # Discord bot setup
+│   └── index.ts         # Entry point
+├── db/
+│   ├── schema.sql       # Database schema
+│   └── seed.sql         # Sample data
+├── systemd/             # Systemd service files
+└── tests/               # Test files
+```
+
+### Running Tests
+
+```bash
+# Run tests in watch mode
+npm test
+
+# Run tests once (CI mode)
+npm run test:ci
+```
+
+### Linting and Formatting
+
+```bash
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
+
+## Discord Commands
+
+### Player Commands
+
+- `/queue join` - Join the queue for your league
+- `/queue leave` - Leave the current queue
+- `/queue status` - Check queue status
+- `/checkin` - Check in after queue pop (5 minutes)
+- `/profile [user]` - View player profile
+
+### Admin Commands
+
+- `/admin queue reset <league>` - Reset a queue
+- `/admin ban <user> <duration> <reason>` - Ban a player
+- `/admin unban <user>` - Remove a ban
+- `/admin stats <user>` - View player stats
+
+## Configuration
+
+All configuration is done via environment variables. See `.env.example` for all available options.
+
+### Key Settings
+
+- `QUEUE_CHECK_IN_TIMEOUT` - Check-in time in seconds (default: 300)
+- `MAP_HISTORY_DAYS` - Days to look back for map history (default: 14)
+- `DODGE_BAN_1/2/3` - Escalating dodge penalties in seconds
+- `LEAGUES` - Comma-separated list of league names
+
+## Apps Script Setup
+
+The bot generates Google Apps Script web app links for match results.
+
+The Apps Script source now lives in `parser/` in this repo.
+
+Use the deployed Apps Script web app URL as:
+
+```env
+APPSCRIPT_BASE_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+```
 
 ## Files Worth Knowing
 

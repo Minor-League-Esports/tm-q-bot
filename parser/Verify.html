@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <title>Replay Verification Tool</title>
+    <style>
+      /* --- 1. General Body and Container Styling (Preserved Dark Mode) --- */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #121212;
+        /* Darker background */
+        color: #e0e0e0;
+        /* Light text */
+        text-align: center;
+      }
+
+      .container {
+        background: #1e1e1e;
+        /* Card background */
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 1100px;
+        margin: 40px auto;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+        border: 1px solid #333;
+        text-align: left;
+      }
+
+      h2 {
+        color: #4caf50;
+        /* Primary green color for branding */
+        margin-bottom: 30px;
+        font-weight: 300;
+        letter-spacing: 1px;
+        text-align: center;
+        border-bottom: 2px solid #333;
+        padding-bottom: 10px;
+      }
+
+      h3,
+      h4 {
+        color: #e0e0e0;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        padding-left: 10px;
+        border-left: 4px solid #4caf50;
+        transition: border-left 0.3s;
+        /* Transition for map list item */
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* --- 2. Information Display (Flex Layout for Summary) --- */
+      #replay-info-summary {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #252525;
+        border-radius: 8px;
+        border: 1px solid #333;
+      }
+
+      .info-item {
+        padding: 5px 15px;
+        flex-grow: 1;
+        min-width: 180px;
+      }
+
+      .info-item label {
+        display: block;
+        color: #9e9e9e;
+        font-size: 0.85em;
+        margin-bottom: 4px;
+      }
+
+      .info-item strong {
+        font-size: 1.1em;
+        color: #ffffff;
+      }
+
+      /* --- 3. Form Styling (Flex Layout for Inputs) --- */
+      .form-section {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+      }
+
+      .input-group {
+        flex: 1 1 45%;
+        min-width: 250px;
+        text-align: left;
+      }
+
+      .input-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #9e9e9e;
+        font-size: 0.9em;
+        font-weight: 500;
+      }
+
+      input[type="text"] {
+        width: 100%;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #333;
+        background: #252525;
+        color: white;
+        font-size: 1em;
+        transition: border-color 0.3s;
+        box-sizing: border-box;
+      }
+
+      input[type="text"]:focus:not([readonly]) {
+        border-color: #4caf50;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+      }
+
+      /* Button Styling */
+      #verifyButton {
+        width: 100%;
+        padding: 14px;
+        border-radius: 6px;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1em;
+        transition: background 0.3s, transform 0.1s;
+        box-sizing: border-box;
+        background: #2196f3;
+        margin-top: 15px;
+      }
+
+      #verifyButton:hover:not(:disabled) {
+        background: #42a5f5;
+        transform: translateY(-1px);
+      }
+
+      #verifyButton:disabled {
+        background: #444;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* --- 4. Table Styling --- */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-size: 0.9em;
+        table-layout: auto;
+      }
+
+      th,
+      td {
+        border: 1px solid #333;
+        padding: 12px 8px;
+        text-align: left;
+        word-break: break-all;
+      }
+
+      th {
+        background: #333;
+        color: #4caf50;
+        font-weight: 500;
+        text-align: center;
+      }
+
+      td {
+        background: #2a2a2a;
+      }
+
+      tr:nth-child(even) td {
+        background: #252525;
+      }
+
+      /* --- 5. Status & Messages --- */
+      #message {
+        background: #2a2a2a;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+        border-left: 4px solid #ff9800;
+        margin-bottom: 20px;
+      }
+
+      /* Specific status colors */
+      .status-Finished {
+        color: #66bb6a;
+      }
+
+      .status-DNF {
+        color: #f44336;
+      }
+
+      .status-Did_not_participate {
+        color: #9e9e9e;
+      }
+
+      .input-warning {
+        border-color: #f44336 !important;
+        box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.5);
+      }
+
+      .success-message {
+        border-color: #66bb6a !important;
+        color: #66bb6a;
+      }
+
+      .error-message {
+        border-color: #f44336 !important;
+        color: #f44336;
+      }
+
+      /* --- 6. Specialized Sections --- */
+      .team-points-summary {
+        display: flex;
+        justify-content: space-around;
+        background: #333;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border-left: 4px solid #4caf50;
+        text-align: center;
+      }
+
+      .team-score {
+        font-size: 1.4em;
+        font-weight: bold;
+        margin-left: 10px;
+        display: block;
+      }
+
+      /* Map List Styling */
+      #mapsPlayedList {
+        margin-top: 25px;
+        padding: 15px;
+        background: #252525;
+        border-radius: 8px;
+        border: 1px solid #333;
+        max-height: 150px;
+        overflow-y: auto;
+        text-align: left;
+      }
+
+      #mapsPlayedList > h4 {
+        font-weight: bold;
+        color: #9e9e9e;
+        margin-bottom: 8px;
+        font-size: 0.9em;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #333;
+        border-left: none;
+        padding-left: 0;
+        margin-top: 0;
+        text-transform: uppercase;
+      }
+
+      #mapList {
+        list-style-type: none;
+        /* Change to none for custom list items */
+        padding-left: 0;
+        margin: 5px 0 0 0;
+        font-size: 0.95em;
+      }
+
+      #mapList li {
+        padding: 8px 10px;
+        /* More padding for click target */
+        cursor: pointer;
+        /* Indicate clickability */
+        border-radius: 4px;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+
+      #mapList li:hover {
+        background: #333;
+        /* Darker hover state */
+      }
+
+      /* Styling for the original SCORED map */
+      #mapList li.scored-map-highlight {
+        color: #4caf50;
+        /* Primary green for the map listed in the submission */
+        font-weight: bold;
+      }
+
+      /* Styling for the CURRENTLY DISPLAYED map (which could be different from the scored map) */
+      #mapList li.active-map {
+        background: #333;
+        /* Highlight background */
+        border-left: 3px solid #ff9800;
+        /* Orange bar to indicate current view */
+        padding-left: 7px;
+        color: #ff9800;
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 700px) {
+        .form-section,
+        #replay-info-summary {
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .input-group,
+        .info-item {
+          min-width: 100%;
+        }
+
+        .container {
+          margin: 20px;
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>Replay Verification Tool</h2>
+
+      <div id="message" class="hidden"></div>
+
+      <div id="already-verified" class="hidden" style="text-align: center">
+        <h3 style="color: #4caf50; border: none; padding-left: 0">
+          ✅ This replay has already been verified and processed.
+        </h3>
+        <p>No further action is required here.</p>
+      </div>
+
+      <input type="hidden" id="currentReplayId" value="<?= replayId ?>" />
+
+      <div id="replay-info" class="hidden">
+        <h4>Replay Summary</h4>
+        <div id="replay-info-summary">
+          <div class="info-item">
+            <label>Submitted By</label>
+            <strong id="submitted-by"></strong>
+          </div>
+          <div class="info-item">
+            <label>Match Type</label>
+            <strong id="match-type"></strong>
+          </div>
+          <div class="info-item">
+            <label>Scored Map Name</label>
+            <strong id="map-name"></strong>
+          </div>
+          <div class="info-item">
+            <label>Scored Map Winner</label>
+            <strong id="map-winner">🏆 </strong>
+          </div>
+          <div class="info-item">
+            <label>Map Duration</label>
+            <strong id="map-duration"></strong>
+          </div>
+        </div>
+        <div id="mapsPlayedList">
+          <h4>ALL MAPS IN MATCH SHEET (Click to view details)</h4>
+          <ul id="mapList"></ul>
+        </div>
+        <h4>Match Points Summary (for this map only)</h4>
+        <div id="team-points-summary" class="team-points-summary"></div>
+
+        <div class="driver-stats-container">
+          <h4>Player Points (for this Scored Map)</h4>
+          <table id="driver-stats-table">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>Player ID</th>
+                <th>Team</th>
+                <th>Points Earned</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <form id="verificationForm">
+          <input type="hidden" id="matchSheetId" />
+
+          <h4>Verification Data Entry</h4>
+          <div class="form-section">
+            <div class="input-group">
+              <label for="scrimId">Select Active Match</label>
+              <select
+                id="scrimId"
+                style="
+                  width: 100%;
+                  padding: 12px;
+                  border-radius: 6px;
+                  border: 1px solid #333;
+                  background: #252525;
+                  color: white;
+                  font-size: 1em;
+                "
+              >
+                <option value="">-- Select a Match --</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="verifiedBy">Your Name (Verifying Player)</label>
+              <input
+                type="text"
+                id="verifiedBy"
+                placeholder="e.g., Fatal"
+                required
+              />
+            </div>
+          </div>
+
+          <button type="submit" id="verifyButton">
+            Confirm & Verify Replay
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      // --- Setup and Constants ---
+      const templateReplayId = '<?= replayId ?>';
+      const paramScrimUid = "<?= (typeof scrimUid !== 'undefined') ? scrimUid : '' ?>";
+      const paramScrimIntId = "<?= (typeof scrimIntId !== 'undefined') ? scrimIntId : '' ?>";
+      const paramIsReportCard = <?= (typeof isReportCard !== 'undefined' && isReportCard) ? 'true' : 'false' ?>;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      // Fallback: Use URL param, then template, then assume null
+      const replayId = urlParams.get('replayId') || templateReplayId || urlParams.get('id') || null;
+      // Note: urlParams.get('id') might be ScrimUid now, so check replayId explicitly first,
+      // but if we are here via doGet, templateReplayId is set correctly.
+
+
+      // --- DOM Elements ---
+      const messageDiv = document.getElementById('message');
+      const replayInfoDiv = document.getElementById('replay-info');
+      const alreadyVerifiedDiv = document.getElementById('already-verified');
+      const verifyButton = document.getElementById('verifyButton');
+      const verificationForm = document.getElementById('verificationForm');
+
+      const matchSheetIdInput = document.getElementById('matchSheetId');
+      const scrimIdSelect = document.getElementById('scrimId');
+      const verifiedByInput = document.getElementById('verifiedBy');
+
+      const mapDurationDisplay = document.getElementById('map-duration');
+      const mapListUl = document.getElementById('mapList');
+      const mapsPlayedListDiv = document.getElementById('mapsPlayedList');
+      const teamSummaryDiv = document.getElementById('team-points-summary');
+      const tableBody = document.getElementById('driver-stats-table').getElementsByTagName('tbody')[0];
+      const currentReplayIdInput = document.getElementById('currentReplayId');
+
+
+      // --- Event Listeners ---
+      document.addEventListener('DOMContentLoaded', () => {
+          currentReplayIdInput.value = replayId; // Store the original replay ID
+          fetchReplayInfo(replayId, null); // Initial load without a specific map ID
+
+          if (paramIsReportCard) {
+               // Report Card Mode: Hide form
+               const form = document.getElementById('verificationForm');
+               if (form) form.classList.add('hidden');
+               const h2 = document.querySelector('h2');
+               if (h2) h2.textContent = "Match Report Card";
+          } else {
+               loadActiveMatches(); // Load active matches (or forced match)
+          }
+      });
+      verificationForm.addEventListener('submit', handleVerificationSubmit);
+
+      // Event listeners for instant validation feedback
+      scrimIdSelect.addEventListener('change', () => scrimIdSelect.classList.remove('input-warning'));
+      verifiedByInput.addEventListener('input', () => verifiedByInput.classList.remove('input-warning'));
+
+
+      /* --- Utility Functions --- */
+
+      /**
+       * Shows an error message and resets the button state.
+       * @param {string | object} error - The error object or string message.
+       */
+      function showError(error) {
+          let messageContent;
+          if (typeof error === 'string') {
+              messageContent = error;
+          } else if (error && error.message) {
+              // Handle Google Apps Script errors
+              messageContent = error.message;
+          } else {
+              messageContent = 'An unknown error occurred.';
+          }
+
+          messageDiv.innerHTML = `❌ Error: ${messageContent}`;
+          messageDiv.classList.remove('hidden');
+          messageDiv.classList.remove('success-message');
+          messageDiv.classList.add('error-message'); // New class for consistent styling
+          messageDiv.style.borderColor = '#f44336'; // Explicit style as fallback
+
+          // Only hide replay info if the error occurs during the initial load
+          // or a map load
+          if (verifyButton.textContent.includes('Loading...')) {
+              replayInfoDiv.classList.add('hidden');
+          }
+          alreadyVerifiedDiv.classList.add('hidden');
+
+          // Reset button to interactable state
+          verifyButton.disabled = false;
+          verifyButton.textContent = 'Confirm & Verify Replay';
+      }
+
+      /**
+       * Shows a non-error status message.
+       */
+      function showMessage(message, color = '#FF9800') {
+          messageDiv.innerHTML = message;
+          messageDiv.classList.remove('hidden', 'success-message', 'error-message');
+          messageDiv.style.borderColor = color;
+      }
+
+      function hideMessage() {
+          messageDiv.classList.add('hidden');
+      }
+
+      function showVerificationSuccess(message) {
+          replayInfoDiv.classList.add('hidden');
+          messageDiv.innerHTML = `<p>✅ **Verification Complete!**</p><p>${message}</p>`;
+          messageDiv.classList.remove('hidden', 'error-message');
+          messageDiv.classList.add('success-message');
+          messageDiv.style.borderColor = '#66BB6A';
+      }
+
+      function formatDuration(ms) {
+          if (typeof ms !== 'number' || ms < 0) return 'N/A';
+          const totalSeconds = Math.floor(ms / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+
+
+      /* --- Core Logic --- */
+
+      /**
+       * NEW: Fetches the replay info, optionally for a specific map.
+       * @param {string} currentReplayId - The ID of the original replay submission.
+       * @param {string | null} mapIdToDisplay - The specific Map ID to display details for.
+       */
+      function fetchReplayInfo(currentReplayId, mapIdToDisplay) {
+          if (!currentReplayId) {
+              showError('Invalid link or missing replay ID in the URL/template.');
+              return;
+          }
+
+          // Show loading status
+          verifyButton.disabled = true;
+          verifyButton.textContent = 'Loading...';
+          showMessage('Loading replay data...', '#FF9800');
+
+          google.script.run
+              .withSuccessHandler(displayReplayInfo)
+              .withFailureHandler(showError)
+              .getReplayInfo(currentReplayId, mapIdToDisplay); // Pass the map ID
+      }
+
+      /**
+       * NEW: Handler for clicking on a map in the list.
+       * @param {string} mapId - The Map ID of the map to load.
+       */
+      function handleMapClick(mapId) {
+          // Get the original submission ID from the hidden input
+          const currentReplayId = document.getElementById('currentReplayId').value;
+          if (currentReplayId && mapId) {
+              console.log('Clicking map with ID:', mapId); // DEBUG
+              // Fetch the new map data for the same replay ID
+              fetchReplayInfo(currentReplayId, mapId);
+          }
+      }
+
+
+      function displayReplayInfo(info) {
+          console.log('Received info:', info); // DEBUG
+
+          hideMessage();
+          verifyButton.disabled = false;
+          verifyButton.textContent = 'Confirm & Verify Replay';
+
+          if (!info || info.error) {
+              showError(info ? info.error : 'Replay data not found or inaccessible.');
+              return;
+          }
+
+          if (info.isVerified) {
+              alreadyVerifiedDiv.classList.remove('hidden');
+              replayInfoDiv.classList.add('hidden'); // Ensure form is hidden
+              return;
+          }
+
+          // Ensure form is visible
+          replayInfoDiv.classList.remove('hidden');
+
+          // Populate Summary Section (for the CURRENTLY DISPLAYED MAP)
+          document.getElementById('submitted-by').textContent = info.submittedBy || 'N/A';
+          document.getElementById('match-type').textContent = info.matchType || 'N/A';
+          document.getElementById('map-name').textContent = info.mapName || 'N/A';
+          document.getElementById('map-winner').textContent = `🏆 ${info.mapWinner || 'N/A'}`;
+          mapDurationDisplay.textContent = formatDuration(info.mapDuration);
+
+          // Set Form Defaults
+          verifiedByInput.value = (info.submittedBy && info.submittedBy.trim()) ? info.submittedBy.trim() : '';
+          matchSheetIdInput.value = (info.defaultMatchSheetId && info.defaultMatchSheetId.trim()) ? info.defaultMatchSheetId.trim() : '';
+          // matchIdInput.value = (info.defaultMatchId && info.defaultMatchId.trim()) ? info.defaultMatchId.trim() : '';
+
+          // --- Display ALL Maps Played (from match sheet) ---
+          mapListUl.innerHTML = ''; // Clear previous content
+          if (info.allMaps && Array.isArray(info.allMaps) && info.allMaps.length > 0) {
+              console.log('All maps:', info.allMaps); // DEBUG
+              console.log('Current display map ID:', info.currentDisplayMapId); // DEBUG
+
+              info.allMaps.forEach(map => {
+                  const mapName = map.name || 'Unknown Map';
+                  const mapId = map.id; // The new Map ID property
+
+                  // Check if this map is the one currently displayed (using the new returned property)
+                  const isCurrentlyDisplayed = mapId === (info.currentDisplayMapId || '');
+                  // Check if this map is the one that triggered the original submission (the one from the sheet entry)
+                  const isOriginalScoredMap = mapName === (info.mapName || '') && mapId === (info.mapId || '');
+
+                  const listItem = document.createElement('li');
+
+                  // Add classes for styling
+                  if (isCurrentlyDisplayed) {
+                      listItem.classList.add('active-map');
+                      listItem.textContent = `▶️ ${mapName} (CURRENTLY DISPLAYED)`;
+                  } else if (isOriginalScoredMap) {
+                      listItem.classList.add('scored-map-highlight');
+                      listItem.textContent = `* ${mapName} (SCORED)`;
+                  } else {
+                      listItem.textContent = mapName;
+                  }
+
+                  // Attach the click handler to *every* map item
+                  if (mapId) {
+                      listItem.addEventListener('click', function () {
+                          console.log('Map clicked:', mapName, 'ID:', mapId); // DEBUG
+                          handleMapClick(mapId);
+                      });
+                  } else {
+                      // For maps without an ID, make them look unclickable
+                      listItem.style.cursor = 'default';
+                      listItem.style.opacity = '0.5';
+                  }
+
+                  mapListUl.appendChild(listItem);
+              });
+              mapsPlayedListDiv.classList.remove('hidden');
+          } else {
+              console.log('No maps to display'); // DEBUG
+              mapsPlayedListDiv.classList.add('hidden');
+          }
+
+          // Display Match Points Summary (Team Points)
+          teamSummaryDiv.innerHTML = ''; // Clear previous content
+          if (info.teamPoints && info.teamPoints.length === 2) {
+              const team1 = info.teamPoints[0];
+              const team2 = info.teamPoints[1];
+
+              const team1Points = parseFloat(team1.matchPoints) || 0;
+              const team2Points = parseFloat(team2.matchPoints) || 0;
+
+              const team1Color = team1Points > team2Points ? '#66BB6A' : (team1Points < team2Points ? '#f44336' : '#FF9800');
+              const team2Color = team2Points > team1Points ? '#66BB6A' : (team2Points < team1Points ? '#f44336' : '#FF9800');
+
+              // Use template literals for cleaner structure
+              teamSummaryDiv.innerHTML = `
+                  <div>
+                      <span>${team1.teamName || 'Team 1'}:</span>
+                      <span class="team-score" style="color: ${team1Color};">${team1Points.toFixed(0)}</span>
+                  </div>
+                  <div>
+                      <span>${team2.teamName || 'Team 2'}:</span>
+                      <span class="team-score" style="color: ${team2Color};">${team2Points.toFixed(0)}</span>
+                  </div>
+              `;
+          } else {
+              teamSummaryDiv.innerHTML = `<span style="color: #FF9800;">Waiting for more map data for cumulative score...</span>`;
+          }
+
+          // Populate Driver Stats Table
+          tableBody.innerHTML = ''; // Clear previous content
+
+          if (info.drivers && info.drivers.length > 0) {
+              info.drivers.forEach(driver => {
+                  const status = driver.status || 'N/A';
+                  const statusClass = 'status-' + status.replace(/[^a-zA-Z0-9]/g, '_');
+                  const row = tableBody.insertRow();
+                  row.insertCell(0).textContent = driver.name || 'Unknown Driver';
+                  row.insertCell(1).textContent = driver.id || 'N/A';
+                  row.insertCell(2).textContent = driver.team || 'N/A';
+                  // Ensure points is a number and round it
+                  const points = parseFloat(driver.points);
+                  row.insertCell(3).textContent = !isNaN(points) ? Math.round(points) : 'N/A';
+                  row.insertCell(4).innerHTML = `<span class="${statusClass}">${status}</span>`;
+              });
+          } else {
+              const row = tableBody.insertRow();
+              const cell = row.insertCell(0);
+              cell.textContent = 'No driver data found for this map.';
+              cell.colSpan = 5;
+          }
+      }
+
+      function loadActiveMatches() {
+          // New Logic: If we have a forced Scrim ID, don't fetch list, just set it.
+          if (paramScrimIntId) {
+              // Determine display text from params or default
+              const display = paramScrimUid ? `Match ${paramScrimUid}` : `Match ID ${paramScrimIntId}`;
+
+              scrimIdSelect.innerHTML = '';
+              const option = document.createElement('option');
+              option.value = paramScrimIntId;
+              option.textContent = `🔒 Validating for: ${display}`;
+              option.selected = true;
+              scrimIdSelect.appendChild(option);
+              scrimIdSelect.disabled = true;
+              return;
+          }
+
+          google.script.run
+              .withSuccessHandler(matches => {
+                  scrimIdSelect.innerHTML = '<option value="">-- Select a Match --</option>';
+                  if (matches && matches.length > 0) {
+                      matches.forEach(m => {
+                          const option = document.createElement('option');
+                          option.value = m.id;
+                          option.textContent = `[${m.type}] ${m.league} - ${m.uid} (${m.created_at})`;
+                          scrimIdSelect.appendChild(option);
+                      });
+                  } else {
+                      const option = document.createElement('option');
+                      option.textContent = 'No active matches found';
+                      scrimIdSelect.appendChild(option);
+                  }
+              })
+              .withFailureHandler(error => {
+                  console.error('Failed to load matches:', error);
+                  const option = document.createElement('option');
+                  option.textContent = 'Error loading matches';
+                  scrimIdSelect.appendChild(option);
+              })
+              .getActiveMatches();
+      }
+
+      function handleVerificationSubmit(event) {
+          event.preventDefault();
+
+          const verifiedBy = verifiedByInput.value.trim();
+          const scrimId = scrimIdSelect.value;
+          let isValid = true;
+
+          // Validation
+          if (!scrimId) { scrimIdSelect.classList.add('input-warning'); isValid = false; } else { scrimIdSelect.classList.remove('input-warning'); }
+          if (!verifiedBy) { verifiedByInput.classList.add('input-warning'); isValid = false; } else { verifiedByInput.classList.remove('input-warning'); }
+
+          if (!isValid) {
+              showMessage('⚠️ Please fill out all required fields (highlighted in red).', '#f44336');
+              return;
+          }
+
+          const verificationData = {
+              replayId: replayId, // Use the original replayId
+              verifiedBy: verifiedBy,
+              scrimId: parseInt(scrimId) // Send the selected Scrim ID
+          };
+
+          verifyButton.disabled = true;
+          verifyButton.textContent = 'Verifying... ⏳';
+          showMessage('Submitting verification...', '#FF9800');
+
+          google.script.run
+              .withSuccessHandler(response => {
+                  // Check for a server-side failure state communicated via success handler
+                  if (response && response.success === false) {
+                      showError(response.message || 'Verification failed on the server, but success handler was called.');
+                  } else if (response && response.success === true) {
+                      showVerificationSuccess(`The replay for **${response.mapName || 'the map'}** has been successfully verified by **${verifiedBy}** and logged to the database.`);
+                  } else {
+                      // Fallback success message
+                      showVerificationSuccess('Verification submitted successfully. Please check your system logs.');
+                  }
+              })
+              .withFailureHandler(showError)
+              .verifyReplay(verificationData);
+      }
+    </script>
+  </body>
+</html>

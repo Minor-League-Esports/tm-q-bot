@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <title>Replay Submission Tool</title>
+    <script>
+      // Inject Scrim Data from Server Template
+      var paramScrim = <?!= (typeof scrim !== 'undefined' && scrim) ? JSON.stringify(scrim) : 'null' ?>;
+    </script>
+    <style>
+      /* General Body and Container Styling */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+        background: #121212; /* Darker background */
+        color: #e0e0e0; /* Light text */
+      }
+      .container {
+        background: #1e1e1e; /* Card background */
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 1100px; /* Increased width */
+        margin: 40px auto;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5); /* Deep shadow */
+        border: 1px solid #333;
+      }
+      h2 {
+        color: #4caf50; /* Primary green color for branding */
+        margin-bottom: 25px;
+        font-weight: 300;
+        letter-spacing: 1px;
+      }
+      h3,
+      h4 {
+        color: #e0e0e0;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        padding-left: 10px;
+        border-left: 4px solid #4caf50;
+      }
+
+      /* Form Element Styling */
+      .input-group {
+        text-align: left;
+        margin-bottom: 20px;
+      }
+      .input-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #9e9e9e;
+        font-size: 0.9em;
+        font-weight: 500;
+      }
+      input[type="text"],
+      select {
+        width: 100%;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #333;
+        background: #252525;
+        color: white;
+        font-size: 1em;
+        transition: border-color 0.3s;
+        box-sizing: border-box;
+      }
+      input[type="text"]:focus,
+      select:focus,
+      input[type="file"]:focus-within {
+        border-color: #4caf50;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+      }
+
+      /* File Input Styling */
+      input[type="file"] {
+        width: 100%;
+        border: 1px solid #333;
+        padding: 12px;
+        background: #252525;
+        color: white;
+        font-size: 1em;
+        border-radius: 6px;
+        cursor: pointer;
+        box-sizing: border-box;
+      }
+
+      /* Button Styling */
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      button {
+        padding: 14px;
+        border-radius: 6px;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1.1em;
+        transition: background 0.3s, transform 0.1s;
+        box-sizing: border-box;
+        user-select: none;
+      }
+      button:disabled {
+        background: #444;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-primary {
+        width: 100%;
+        background: #4caf50;
+      }
+      .btn-primary:not(:disabled):hover {
+        background: #66bb6a;
+        transform: translateY(-1px);
+      }
+      .btn-secondary {
+        flex-grow: 1;
+        background: #2196f3;
+      }
+      .btn-secondary:not(:disabled):hover {
+        background: #42a5f5;
+      }
+      .btn-success {
+        flex-grow: 1;
+        background: #ff9800;
+      }
+      .btn-success:not(:disabled):hover {
+        background: #ffb74d;
+      }
+      button:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      /* Result and Preview Styling */
+      #result {
+        margin-top: 25px;
+        background: #2a2a2a;
+        padding: 20px;
+        border-radius: 8px;
+        display: none;
+        text-align: left;
+        word-break: break-word;
+        border-left: 4px solid #4caf50;
+      }
+      .link-input-group {
+        display: flex;
+        margin-top: 15px;
+        gap: 10px;
+      }
+      .link-input-group input {
+        flex-grow: 1;
+        cursor: pointer;
+      }
+      .share-link-text {
+        color: #e0e0e0;
+        font-weight: 500;
+      }
+      #result p {
+        margin: 5px 0;
+      }
+      #result strong {
+        color: #fff;
+      }
+
+      /* Replay Summary Box */
+      #replay-info-summary {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #252525;
+        border-radius: 8px;
+        border: 1px solid #333;
+      }
+      .info-item {
+        padding: 5px 15px;
+        flex-grow: 1;
+        min-width: 180px;
+      }
+      .info-item label {
+        display: block;
+        color: #9e9e9e;
+        font-size: 0.85em;
+        margin-bottom: 4px;
+      }
+      .info-item strong {
+        font-size: 1.1em;
+        color: #ffffff;
+      }
+
+      #replayPreview {
+        margin-top: 25px;
+        background: #2a2a2a;
+        padding: 20px;
+        border-radius: 8px;
+        display: none;
+        text-align: left;
+        border-left: 4px solid #2196f3;
+        font-size: 0.9em;
+      }
+
+      /* Map List Styling (from Verify.html) */
+      #mapsPlayedList {
+        margin-top: 25px;
+        padding: 15px;
+        background: #252525;
+        border-radius: 8px;
+        border: 1px solid #333;
+        max-height: 200px;
+        overflow-y: auto;
+        text-align: left;
+      }
+      #mapsPlayedList > h4 {
+        font-weight: bold;
+        color: #9e9e9e;
+        margin-bottom: 8px;
+        font-size: 0.9em;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #333;
+        border-left: none;
+        padding-left: 0;
+        margin-top: 0;
+        text-transform: uppercase;
+      }
+      #mapList {
+        list-style-type: none;
+        padding-left: 0;
+        margin: 5px 0 0 0;
+        font-size: 0.95em;
+      }
+      #mapList li {
+        padding: 8px 10px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.15s;
+        margin-bottom: 4px;
+      }
+      #mapList li:hover {
+        background: #333;
+      }
+      #mapList li.active-map {
+        background: #333;
+        border-left: 3px solid #ff9800;
+        padding-left: 7px;
+        color: #ff9800;
+      }
+
+      /* Team Points Summary styling */
+      .team-points-summary {
+        display: flex;
+        justify-content: space-around;
+        background: #333;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border-left: 4px solid #4caf50;
+        text-align: center;
+      }
+      .team-score {
+        font-size: 1.4em;
+        font-weight: bold;
+        margin-left: 10px;
+        display: block;
+      }
+
+      /* Table Styling */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-size: 0.9em;
+        table-layout: auto;
+      }
+      th,
+      td {
+        border: 1px solid #333;
+        padding: 10px 8px;
+        text-align: left;
+        word-break: break-all;
+      }
+      th {
+        background: #333;
+        color: #4caf50;
+        font-weight: 500;
+        text-align: center;
+      }
+      td {
+        background: #2a2a2a;
+      }
+      tr:nth-child(even) td {
+        background: #252525;
+      }
+      /* Status Highlighting */
+      .status-Finished {
+        color: #66bb6a;
+      }
+      .status-DNF {
+        color: #f44336;
+      }
+      .status-Did_not_participate {
+        color: #9e9e9e;
+      }
+
+      /* Added for the new flow */
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Replay Submission Tool</h2>
+
+      <form id="submissionForm">
+        <div class="input-group">
+          <label for="submittedBy">Your Name</label>
+          <input
+            type="text"
+            id="submittedBy"
+            placeholder="e.g., Icy"
+            required
+          />
+        </div>
+
+        <div class="input-group">
+          <label for="matchType">Match Type</label>
+          <select id="matchType" required>
+            <option value="">-- Select Match Type --</option>
+            <option value="League Match">League Match</option>
+            <option value="Qualifier">Qualifier</option>
+            <option value="Playoff Match">Playoff Match</option>
+            <option value="Practice">Practice</option>
+            <option value="Internal Scrim">Internal Scrim</option>
+            <option value="External Scrim">External Scrim</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="replayFile">Replay JSON File</label>
+          <input type="file" id="replayFile" accept=".json" required />
+        </div>
+
+        <button type="submit" class="btn-primary" id="submitButton">
+          Submit Replay
+        </button>
+      </form>
+
+      <div id="result"></div>
+
+      <div id="replayPreview"></div>
+    </div>
+
+    <script>
+      const submitButton = document.getElementById("submitButton");
+      const submissionForm = document.getElementById("submissionForm");
+      const resultDiv = document.getElementById("result");
+      const previewDiv = document.getElementById("replayPreview");
+
+      // Global variable to store all maps data
+      let allMapsData = [];
+      let currentDisplayMapId = null;
+
+      /**
+       * Copies the verification link to the clipboard using modern API.
+       */
+      async function copyLink() {
+        const linkInput = document.getElementById("verify-link-display");
+        if (linkInput) {
+          try {
+            await navigator.clipboard.writeText(linkInput.value);
+            alert("✅ Verification link copied to clipboard!");
+          } catch (err) {
+            console.error("Failed to copy text: ", err);
+            linkInput.select();
+            document.execCommand("copy");
+            alert("✅ Verification link copied to clipboard! (Fallback)");
+          }
+        }
+      }
+
+      /**
+       * Hides the confirmation button and shows the verification link steps.
+       */
+      function confirmAndProceed() {
+        document
+          .getElementById("submitter-confirm-group")
+          ?.classList.add("hidden");
+        document
+          .getElementById("verification-steps")
+          ?.classList.remove("hidden");
+      }
+
+      /**
+       * Switches the displayed map when user clicks on a map in the list
+       */
+      function switchDisplayedMap(mapId) {
+        const mapData = allMapsData.find((m) => m.mapId === mapId);
+        if (!mapData) return;
+
+        currentDisplayMapId = mapId;
+        renderSingleMap(mapData);
+        updateMapListHighlight();
+      }
+
+      /**
+       * Updates the active highlight on the map list
+       */
+      function updateMapListHighlight() {
+        const mapListItems = document.querySelectorAll("#mapList li");
+        mapListItems.forEach((item) => {
+          const itemMapId = item.getAttribute("data-map-id");
+          if (itemMapId === currentDisplayMapId) {
+            item.classList.add("active-map");
+            item.textContent = `▶️ ${item.getAttribute(
+              "data-map-name"
+            )} (CURRENTLY DISPLAYED)`;
+          } else {
+            item.classList.remove("active-map");
+            item.textContent = item.getAttribute("data-map-name");
+          }
+        });
+      }
+
+      /**
+       * Renders a single map's details
+       */
+      function renderSingleMap(mapData) {
+        const submittedBy = document.getElementById("submittedBy").value.trim();
+        const matchType = document.getElementById("matchType").value;
+
+        const mapScores = mapData.mapScores || [];
+        const team1Data = mapScores.find((d) => d.teamName === "1") || {
+          totalPoints: 0,
+          teamName: "1",
+        };
+        const team2Data = mapScores.find((d) => d.teamName === "2") || {
+          totalPoints: 0,
+          teamName: "2",
+        };
+
+        const team1Name = mapData.team1Name || "Team 1";
+        const team2Name = mapData.team2Name || "Team 2";
+
+        const team1Points = team1Data.totalPoints;
+        const team2Points = team2Data.totalPoints;
+
+        const team1Color =
+          team1Points > team2Points
+            ? "#66BB6A"
+            : team1Points < team2Points
+            ? "#f44336"
+            : "#FF9800";
+        const team2Color =
+          team2Points > team1Points
+            ? "#66BB6A"
+            : team2Points < team1Points
+            ? "#f44336"
+            : "#FF9800";
+
+        const winnerIsTeam1 = team1Points > team2Points;
+        const winnerName = winnerIsTeam1 ? team1Name : team2Name;
+
+        // Find the content container (below the map list)
+        const contentContainer = document.getElementById(
+          "map-content-container"
+        );
+
+        let contentHtml = `
+                <h4>Match Points Summary (for this map only)</h4>
+                <div class="team-points-summary">
+                    <div>
+                        <span>${team1Name}:</span>
+                        <span class="team-score" style="color: ${team1Color};">${team1Points}</span>
+                    </div>
+                    <div>
+                        <span>${team2Name}:</span>
+                        <span class="team-score" style="color: ${team2Color};">${team2Points}</span>
+                    </div>
+                </div>
+                
+                <h4>Player Points (for this Scored Map)</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Driver</th>
+                            <th>Player ID</th>
+                            <th>Team</th>
+                            <th>Points Earned</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+        // Add player rows
+        mapData.driverPlacements.forEach((d) => {
+          const statusClass = "status-" + d.status.replace(/\s/g, "_");
+          contentHtml += `
+                    <tr>
+                        <td style="font-weight: bold;">${d.name}</td>
+                        <td style="text-align: center;">${d.id || "N/A"}</td>
+                        <td style="text-align: center;">${d.team}</td>
+                        <td style="text-align: center;">${Math.round(
+                          d.points
+                        )}</td>
+                        <td class="${statusClass}" style="text-align: center;">${
+            d.status
+          }</td>
+                    </tr>
+                `;
+        });
+
+        contentHtml += `
+                    </tbody>
+                </table>
+            `;
+
+        contentContainer.innerHTML = contentHtml;
+      }
+
+      /**
+       * Renders all maps with clickable list (like Verify.html)
+       */
+      function renderAllResults(response) {
+        const allMaps = response.allParsedMaps || [];
+        const submittedBy = document.getElementById("submittedBy").value.trim();
+        const matchType = document.getElementById("matchType").value;
+
+        // Filter out maps with 0 winner points
+        const validMaps = allMaps.filter((mapData) => {
+          const mapScores = mapData.mapScores || [];
+          if (mapScores.length === 0) return false;
+          const winnerScoreData = mapScores[0];
+          return winnerScoreData.totalPoints > 0;
+        });
+
+        if (validMaps.length === 0) {
+          previewDiv.innerHTML = `<p style="color:#f44336;">No usable map data found in the replay file (all maps had 0 scores).</p>`;
+          previewDiv.style.display = "block";
+          return;
+        }
+
+        // Store maps data globally
+        allMapsData = validMaps;
+        currentDisplayMapId = validMaps[0].mapId; // Default to first map
+
+        // Build the preview HTML structure
+        let previewHtml = `
+                <h4 style="color: #4CAF50; border-left: none; padding-left: 0;">Replay Summary</h4>
+                <div id="replay-info-summary">
+                    <div class="info-item">
+                        <label>Submitted By</label>
+                        <strong>${submittedBy}</strong>
+                    </div>
+                    <div class="info-item">
+                        <label>Match Type</label>
+                        <strong>${matchType}</strong>
+                    </div>
+                    <div class="info-item">
+                        <label>Replay ID</label>
+                        <strong>${response.replayId}</strong>
+                    </div>
+                    <div class="info-item">
+                        <label>Total Maps</label>
+                        <strong>${validMaps.length}</strong>
+                    </div>
+                </div>
+                
+                <div id="mapsPlayedList">
+                    <h4>ALL MAPS IN MATCH SHEET (CLICK TO VIEW DETAILS)</h4>
+                    <ul id="mapList">
+            `;
+
+        // Add map list items
+        validMaps.forEach((mapData, index) => {
+          const isFirst = index === 0;
+          previewHtml += `
+                    <li data-map-id="${mapData.mapId}" 
+                        data-map-name="${mapData.mapName}"
+                        class="${isFirst ? "active-map" : ""}"
+                        onclick="switchDisplayedMap('${mapData.mapId}')">
+                        ${isFirst ? "▶️ " : ""}${mapData.mapName}${
+            isFirst ? " (CURRENTLY DISPLAYED)" : ""
+          }
+                    </li>
+                `;
+        });
+
+        previewHtml += `
+                    </ul>
+                </div>
+                
+                <div id="map-content-container">
+                    <!-- Map details will be inserted here -->
+                </div>
+            `;
+
+        previewDiv.innerHTML = previewHtml;
+        previewDiv.style.display = "block";
+
+        // Render the first map by default
+        renderSingleMap(validMaps[0]);
+
+        // Clear the file input only on success
+        document.getElementById("replayFile").value = "";
+      }
+
+      /**
+       * Handles successful response from Apps Script.
+       */
+      function handleSuccess(response) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Submit Replay";
+        resultDiv.style.display = "block";
+
+        if (response.success) {
+          // 1. Result Message HTML
+          resultDiv.innerHTML = `
+                    <p style="color: #4CAF50; font-size: 1.2em;"><strong>✅ Submission Successful!</strong></p>
+                    
+                    <p class="share-link-text" style="font-size: 1.1em; color: #FF9800;">
+                        **STEP 1: Submitter Review**
+                    </p>
+
+                    <div id="submitter-confirm-group" class="button-group" style="margin-bottom: 20px;">
+                        <button class="btn-success" onclick="confirmAndProceed()">I Confirm Results Are Correct</button>
+                    </div>
+                    
+                    <div id="verification-steps" class="hidden">
+                        <p class="share-link-text">
+                            **STEP 2: Please send the link below to another player to perform the final verification.**
+                        </p>
+                        <div class="link-input-group">
+                            <input type="text" id="verify-link-display" value="${response.verifyLink}" readonly>
+                            <button class="btn-secondary" onclick="copyLink()">Copy Link</button>
+                        </div>
+                    </div>
+
+                    <p style="margin-top: 15px;">**Please check the parsed results below for immediate review.**</p>
+                `;
+
+          // 2. Render all content using the updated data structure
+          renderAllResults(response);
+        } else {
+          resultDiv.innerHTML = `<p style="color:#f44336;"><strong>❌ Submission Error: ${response.message}</strong></p>`;
+          previewDiv.style.display = "none";
+        }
+      }
+
+      /**
+       * Handles failure response from Apps Script or client-side errors.
+       */
+      function handleError(error) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Submit Replay";
+        resultDiv.innerHTML = `<p style="color:#f44336;">❌ System Error: ${error.message}</p>`;
+        previewDiv.style.display = "none";
+      }
+
+      // Attach event listener to the form on load
+      submissionForm.addEventListener("submit", handleFormSubmit);
+
+      // Auto-fill and Display Scrim Info
+      document.addEventListener("DOMContentLoaded", () => {
+        if (paramScrim) {
+          // Show Match Info
+          const container = document.querySelector(".container");
+          const title = document.querySelector("h2");
+          const infoDiv = document.createElement("div");
+          infoDiv.style.cssText =
+            "background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #4CAF50; text-align: left;";
+          infoDiv.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0; border: none; padding: 0; color: #fff;">Target Match Details</h3>
+                    <p style="margin: 5px 0;"><strong>League:</strong> ${
+                      paramScrim.league || "N/A"
+                    }</p>
+                    <p style="margin: 5px 0;"><strong>Type:</strong> ${
+                      paramScrim.type || "N/A"
+                    }</p>
+                    <p style="margin: 5px 0; color: #999; font-size: 0.8em;">ID: ${
+                      paramScrim.uid
+                    }</p>
+                 `;
+          container.insertBefore(infoDiv, title.nextSibling);
+
+          // Pre-fill Match Type
+          const matchTypeSelect = document.getElementById("matchType");
+          if (matchTypeSelect && paramScrim.type) {
+            matchTypeSelect.value = paramScrim.type;
+            // Optional: Lock it if we are sure
+            // matchTypeSelect.disabled = true;
+          }
+        }
+      });
+
+      // Keep this separate from handleSuccess/Failure as it's the entry point for form data
+      function handleFormSubmit(event) {
+        event.preventDefault(); // Stop default form submission
+
+        const submittedBy = document.getElementById("submittedBy").value.trim();
+        const matchType = document.getElementById("matchType").value;
+        const fileInput = document.getElementById("replayFile");
+
+        if (!submittedBy) {
+          alert("Please enter your name.");
+          return;
+        }
+        if (!matchType) {
+          alert("Please select a Match Type.");
+          return;
+        }
+        if (fileInput.files.length === 0) {
+          alert("Please select a JSON file.");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        submitButton.disabled = true;
+        submitButton.textContent = "Processing... ⏳";
+        resultDiv.style.display = "block";
+        resultDiv.innerHTML =
+          "<p style='color: #FF9800;'>Submitting replay... ⏳</p>";
+        previewDiv.style.display = "none";
+
+        reader.onload = function (e) {
+          let jsonData;
+          try {
+            jsonData = JSON.parse(e.target.result);
+          } catch (err) {
+            handleError(
+              new Error("Invalid JSON! Please check your file format.")
+            );
+            return;
+          }
+
+          google.script.run
+            .withSuccessHandler(handleSuccess)
+            .withFailureHandler(handleError)
+            .processReplay(
+              jsonData,
+              submittedBy,
+              matchType,
+              paramScrim ? paramScrim.uid : null
+            );
+        };
+
+        reader.onerror = function (e) {
+          handleError(new Error("Error reading file: " + e.target.error.name));
+        };
+
+        reader.readAsText(file);
+      }
+    </script>
+  </body>
+</html>
