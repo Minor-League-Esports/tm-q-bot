@@ -4,7 +4,7 @@ import { playerService } from './player.service.js';
 import { banService } from './ban.service.js';
 import { mapService } from './map.service.js';
 import { scrimService } from './scrim.service.js';
-import { Player, Scrim, Map as GameMap } from '../types.js';
+import { Player, Scrim, ScrimPlayer, Map as GameMap } from '../types.js';
 
 // Mock dependencies
 vi.mock('./player.service.js');
@@ -47,6 +47,21 @@ describe('QueueService', () => {
         created_at: new Date(),
     };
 
+    const makePlayer = (id: number): Player => ({
+        ...mockPlayer,
+        id,
+        discord_id: `id${id}`,
+        discord_username: `user${id}`,
+    });
+
+    const makeScrimPlayer = (playerId: number, checkedIn: boolean): ScrimPlayer => ({
+        id: playerId,
+        scrim_id: mockScrim.id,
+        player_id: playerId,
+        checked_in: checkedIn,
+        checkin_at: checkedIn ? new Date() : null,
+    });
+
     beforeEach(() => {
         // Reset mocks
         vi.clearAllMocks();
@@ -55,6 +70,7 @@ describe('QueueService', () => {
         queueService = new QueueService();
 
         // Setup default mock implementations
+        vi.mocked(playerService.syncPlayerFromSprocket).mockResolvedValue(mockPlayer);
         vi.mocked(playerService.getByDiscordId).mockResolvedValue(mockPlayer);
         vi.mocked(banService.isPlayerBanned).mockResolvedValue(false);
         vi.mocked(playerService.getByIds).mockResolvedValue([mockPlayer, mockPlayer, mockPlayer, mockPlayer]);
@@ -89,12 +105,12 @@ describe('QueueService', () => {
         });
 
         it('should reject unregistered players', async () => {
-            vi.mocked(playerService.getByDiscordId).mockResolvedValue(null);
+            vi.mocked(playerService.syncPlayerFromSprocket).mockResolvedValue(null);
 
             const result = await queueService.joinQueue('unknown', 'unknown');
 
             expect(result.success).toBe(false);
-            expect(result.message).toContain('must be registered');
+            expect(result.message).toContain('valid Sprocket Trackmania profile');
             expect(queueService.getLeagueQueue('Master')).toHaveLength(0);
         });
 
@@ -132,6 +148,70 @@ describe('QueueService', () => {
         });
     });
 
+    describe('cancelQueueScrim', () => {
+        it('should cancel a checking-in scrim and return only checked-in players to the queue', async () => {
+            const scrimPlayers: ScrimPlayer[] = [
+                makeScrimPlayer(1, true),
+                makeScrimPlayer(2, false),
+                makeScrimPlayer(3, true),
+                makeScrimPlayer(4, false),
+            ];
+            const restoredPlayers = [makePlayer(1), makePlayer(3)];
+
+            vi.mocked(scrimService.getById).mockResolvedValue({ ...mockScrim, status: 'checking_in' });
+            vi.mocked(scrimService.getScrimPlayers).mockResolvedValue(scrimPlayers);
+            vi.mocked(scrimService.cancelScrim).mockResolvedValue();
+            vi.mocked(playerService.getByIds).mockResolvedValue(restoredPlayers);
+
+            const result = await queueService.cancelQueueScrim(mockScrim.id);
+
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('Returned 2 player(s) to the queue');
+            expect(result.restoredPlayerIds).toEqual([1, 3]);
+            expect(scrimService.cancelScrim).toHaveBeenCalledWith(mockScrim.id);
+            expect(banService.applyDodgePenalty).not.toHaveBeenCalled();
+            expect(queueService.getLeagueQueue('Master')).toHaveLength(2);
+            expect(queueService.getLeagueQueue('Master').map((entry) => entry.playerId)).toEqual([3, 1]);
+        });
+
+        it('should cancel an active scrim and return all players to the queue', async () => {
+            const scrimPlayers: ScrimPlayer[] = [
+                makeScrimPlayer(1, true),
+                makeScrimPlayer(2, true),
+                makeScrimPlayer(3, true),
+                makeScrimPlayer(4, true),
+            ];
+            const restoredPlayers = [makePlayer(1), makePlayer(2), makePlayer(3), makePlayer(4)];
+
+            vi.mocked(scrimService.getById).mockResolvedValue({ ...mockScrim, status: 'active' });
+            vi.mocked(scrimService.getScrimPlayers).mockResolvedValue(scrimPlayers);
+            vi.mocked(scrimService.cancelScrim).mockResolvedValue();
+            vi.mocked(playerService.getByIds).mockResolvedValue(restoredPlayers);
+
+            const result = await queueService.cancelQueueScrim(mockScrim.id);
+
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('Returned 4 player(s) to the queue');
+            expect(result.restoredPlayerIds).toEqual([1, 2, 3, 4]);
+            expect(scrimService.cancelScrim).toHaveBeenCalledWith(mockScrim.id);
+            expect(banService.applyDodgePenalty).not.toHaveBeenCalled();
+            expect(queueService.getLeagueQueue('Master')).toHaveLength(4);
+            expect(queueService.getLeagueQueue('Master').map((entry) => entry.playerId)).toEqual([4, 3, 2, 1]);
+        });
+
+        it('should refuse to cancel a scrim that is already completed', async () => {
+            vi.mocked(scrimService.getById).mockResolvedValue({ ...mockScrim, status: 'completed' });
+
+            const result = await queueService.cancelQueueScrim(mockScrim.id);
+
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('already completed');
+            expect(scrimService.cancelScrim).not.toHaveBeenCalled();
+            expect(queueService.getLeagueQueue('Master')).toHaveLength(0);
+            expect(banService.applyDodgePenalty).not.toHaveBeenCalled();
+        });
+    });
+
     describe('popQueue', () => {
         it('should emit queuePop event when 4 players join', async () => {
             const queuePopSpy = vi.fn();
@@ -140,7 +220,7 @@ describe('QueueService', () => {
             // Add 3 players
             for (let i = 1; i <= 3; i++) {
                 const player = { ...mockPlayer, id: i, discord_id: `id${i}` };
-                vi.mocked(playerService.getByDiscordId).mockResolvedValueOnce(player);
+                vi.mocked(playerService.syncPlayerFromSprocket).mockResolvedValueOnce(player);
                 await queueService.joinQueue(player.discord_id, player.discord_username);
             }
 
@@ -149,7 +229,7 @@ describe('QueueService', () => {
 
             // Add 4th player
             const player4 = { ...mockPlayer, id: 4, discord_id: 'id4' };
-            vi.mocked(playerService.getByDiscordId).mockResolvedValueOnce(player4);
+            vi.mocked(playerService.syncPlayerFromSprocket).mockResolvedValueOnce(player4);
             await queueService.joinQueue(player4.discord_id, player4.discord_username);
 
             // Wait for async operations

@@ -1,200 +1,108 @@
-# Quick Start Guide
+# Quick Start
 
-Get your Discord bot running in minutes!
+This guide gets the bot running in a test server. If you want to understand how players and admins use it once it is live, read [How the Bot Works](USING_THE_BOT.md).
 
-## Prerequisites
+## 1. Prerequisites
 
-1. **Node.js 20+** installed
-2. **Discord Bot Token** - Follow steps below to create one
+- Node.js 20+
+- PostgreSQL 16+
+- A Discord application with a bot user
+- A deployed Google Apps Script web app for match-result links
+- A Trackmania profile in Sprocket for each player who will queue
 
-## Step 1: Create a Discord Bot
+## 2. Create Or Reuse A Discord Application
 
-1. Go to https://discord.com/developers/applications
-2. Click "New Application" and give it a name (e.g., "TM Scrim Bot")
-3. Go to the "Bot" tab
-4. Click "Add Bot"
-5. Under "Token", click "Reset Token" and copy it (save this for later)
-6. Enable these Privileged Gateway Intents:
-   - ✅ Server Members Intent
-   - ✅ Message Content Intent
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Create a new application or open the existing TM Scrim Bot app.
+3. Add a bot user and copy the bot token, application ID, and server ID.
+4. Enable the privileged intents your server policy requires.
 
-## Step 2: Invite Bot to Your Server
+If you need a reminder for the invite URL and permissions, see [Discord Bot Invite Setup](BOT_INVITE_SETUP.md).
 
-1. Go to the "OAuth2" → "URL Generator" tab
-2. Select scopes:
-   - ✅ `bot`
-   - ✅ `applications.commands`
-3. Select bot permissions:
-   - ✅ Send Messages
-   - ✅ Use Slash Commands
-   - ✅ Embed Links
-4. Copy the generated URL at the bottom
-5. Open it in your browser and add the bot to your test server
+## 3. Configure Environment Variables
 
-## Step 3: Get Your Guild ID and Client ID
+Copy the example file and fill in the required values:
 
-1. In Discord, enable Developer Mode:
-   - Settings → Advanced → Developer Mode (toggle on)
-2. Right-click your server name → "Copy Server ID" (this is your GUILD_ID)
-3. Back in Discord Developer Portal, go to "General Information"
-4. Copy your "Application ID" (this is your CLIENT_ID)
-
-## Step 4: Configure the Bot
-
-1. Copy the example environment file:
 ```bash
 cp .env.example .env
 ```
 
-2. Edit `.env` and add your credentials:
+Required values:
+
 ```env
-DISCORD_BOT_TOKEN=your_token_here
-DISCORD_GUILD_ID=your_guild_id_here
-DISCORD_CLIENT_ID=your_client_id_here
-
-# For now, use a dummy database URL (database features won't work without real DB)
-DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
-
-# Leave other settings as default
+DISCORD_BOT_TOKEN=...
+DISCORD_GUILD_ID=...
+DISCORD_CLIENT_ID=...
+DATABASE_URL=postgresql://...
+DATABASE_SCHEMA=trackmania
+APPSCRIPT_BASE_URL=https://script.google.com/macros/s/.../exec
 ```
 
-## Step 5: Install Dependencies
+Useful behavior settings:
+
+```env
+QUEUE_CHECK_IN_TIMEOUT=300
+MAP_HISTORY_DAYS=14
+MIN_MAP_POOL_SIZE=10
+DODGE_BAN_1=300
+DODGE_BAN_2=1800
+DODGE_BAN_3=7200
+LEAGUES=Academy,Champion,Master
+```
+
+## 4. Set Up The Database
+
+Create the schema, then add the Elo/stat migration if you want match completion and rating processing:
+
+```bash
+psql -U postgres -f db/schema.sql
+psql -U postgres -f db/migrations/001_elo_and_stats.sql
+```
+
+If you are using Docker for local development, make sure the database container is running before you seed or start the bot.
+
+For a local test environment, you can also load the sample seed data:
+
+```bash
+psql -U postgres -f db/seed.sql
+```
+
+That seed gives you a starter map pool and example player records. Do not use it in production.
+
+## 5. Install Dependencies And Deploy Commands
 
 ```bash
 npm install
-```
-
-## Step 6: Deploy Commands to Discord
-
-This registers your slash commands with Discord:
-
-```bash
 npm run deploy-commands
 ```
 
-You should see output like:
-```
-Successfully deployed 4 commands to guild YOUR_GUILD_ID
-  - /queue
-  - /checkin
-  - /profile
-  - /admin
-```
+Discord will receive four command groups:
 
-## Step 7: Run the Bot
+- `/queue`
+- `/checkin`
+- `/profile`
+- `/admin`
 
-### Without Database (Limited Functionality)
-
-The bot will start but commands that require the database will return errors. Queue commands will work in-memory only.
+## 6. Start The Bot
 
 ```bash
 npm run dev
 ```
 
-You should see:
-```
-Bot ready! Logged in as YourBot#1234
-```
+You should see the bot log in, connect to the database, and start the queue event handlers.
 
-### With Database (Full Functionality)
+## 7. First Smoke Test
 
-1. Set up PostgreSQL (Docker recommended):
-```bash
-docker-compose up -d db
-```
+Use these checks in Discord:
 
-2. Run the schema:
-```bash
-docker exec -i tm-scrim-db psql -U tmscrim -d tmscrim < db/schema.sql
-docker exec -i tm-scrim-db psql -U tmscrim -d tmscrim < db/seed.sql
-```
+- `/queue status` to confirm the queues are visible.
+- `/profile` to confirm the bot can find your player record.
+- `/queue join` to verify your Sprocket profile and league mapping work.
 
-3. Update `.env` with the correct database URL:
-```env
-DATABASE_URL=postgresql://tmscrim:changeme@localhost:5432/tmscrim
-```
+If `/queue join` fails, the usual causes are:
 
-4. Start the bot:
-```bash
-npm run dev
-```
+- the Discord ID is not linked to a Trackmania profile in Sprocket
+- the player does not have a supported league mapping
+- the player is currently banned from queueing
 
-## Step 8: Test the Commands
-
-In your Discord server, try these commands:
-
-### Queue Commands
-- `/queue status` - Check queue status (should work without DB)
-- `/queue join` - Join queue (requires DB for player registration)
-- `/queue list` - List players in queue
-- `/queue leave` - Leave queue
-
-### Check-in Command
-- `/checkin` - Check in for a scrim (requires DB)
-
-### Profile Command
-- `/profile` - View your profile (requires DB)
-- `/profile @user` - View another user's profile (requires DB)
-
-### Admin Commands (requires Manage Server permission)
-- `/admin queue-reset league:Academy` - Reset a queue
-- `/admin ban user:@someone duration:5 reason:Testing` - Ban a user
-- `/admin unban user:@someone` - Unban a user
-- `/admin stats user:@someone` - View stats
-- `/admin dodges user:@someone` - View dodge history
-
-## Expected Behavior Without Database
-
-✅ **Will work:**
-- `/queue status` - Shows empty queues
-- `/queue list` - Shows no players
-- `/admin queue-reset` - Clears in-memory queues
-
-❌ **Will error (gracefully):**
-- `/queue join` - "You must be registered..."
-- `/checkin` - "You must be registered..."
-- `/profile` - "Not registered in the system"
-- `/admin ban/unban/stats/dodges` - Database errors
-
-## Troubleshooting
-
-### Bot doesn't respond to commands
-- Make sure you ran `npm run deploy-commands`
-- Wait a few minutes for Discord to sync commands
-- Try kicking and re-inviting the bot
-
-### Commands don't appear
-- Check that bot has proper permissions
-- Verify GUILD_ID and CLIENT_ID are correct
-- Try deploying commands again
-
-### Database connection errors
-- Check PostgreSQL is running: `docker ps`
-- Verify DATABASE_URL is correct
-- Check database logs: `docker logs tm-scrim-db`
-
-## Next Steps
-
-1. Set up the database for full functionality
-2. Register test players in the database
-3. Test the full queue → pop → checkin flow
-4. Configure Google Apps Script web app integration for match results
-
-## Development Commands
-
-```bash
-# Watch mode (auto-reload on changes)
-npm run dev
-
-# Build for production
-npm run build
-
-# Run production build
-npm start
-
-# Run tests
-npm test
-
-# Deploy commands to Discord
-npm run deploy-commands
-```
+Once the bot responds correctly, move on to [How the Bot Works](USING_THE_BOT.md) for the full operator flow.

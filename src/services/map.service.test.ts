@@ -8,7 +8,8 @@ vi.mock('../db/index.js', () => ({
   db: {
     query: vi.fn(),
     getClient: vi.fn(),
-  }
+  },
+  tableName: vi.fn((table: string) => `"public"."${table}"`),
 }));
 // Mock config to avoid environment variable checks
 vi.mock('../config.js', () => ({
