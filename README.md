@@ -191,6 +191,8 @@ All configuration is done via environment variables. See `.env.example` for all 
 
 The bot generates Google Apps Script web app links for match results.
 
+The Apps Script source now lives in `parser/` in this repo.
+
 Use the deployed Apps Script web app URL as:
 
 ```env

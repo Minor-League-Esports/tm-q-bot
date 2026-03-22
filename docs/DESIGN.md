@@ -89,6 +89,7 @@ For each scrim:
 
 #### Google Apps Script Integration
 - Deployed Apps Script web app handles replay upload and verification
+- Apps Script source is kept in-repo under `parser/`
 - Bot generates web app link with URL parameters:
   - Scrim ID via `id`
   - Player names

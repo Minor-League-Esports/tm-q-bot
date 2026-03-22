@@ -58,6 +58,8 @@ DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 # Leave other settings as default
 ```
 
+The Google Apps Script source for the replay submission flow now lives in `parser/` in this repo. Deploy that folder as your Apps Script project, then set `APPSCRIPT_BASE_URL` to the deployed web app URL.
+
 ## Step 5: Install Dependencies
 
 ```bash
