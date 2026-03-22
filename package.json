@@ -11,8 +11,10 @@
     "start": "node dist/index.js",
     "deploy-commands": "npm run build && node dist/scripts/deploy-commands.js",
     "validate:integration": "tsx src/scripts/validate-integration.ts",
-    "test": "vitest",
-    "test:ci": "vitest run",
+    "test": "vitest --config vitest.config.ts",
+    "test:ci": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest --config vitest.integration.config.ts",
+    "test:integration:ci": "vitest run --config vitest.integration.config.ts",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "db:migrate": "node dist/db/migrate.js"

@@ -13,6 +13,14 @@ export interface QueuePopEvent {
   maps: Map[];
 }
 
+export interface QueueScrimCancelResult {
+  success: boolean;
+  message: string;
+  scrimId: number;
+  scrimUid?: string;
+  restoredPlayerIds: number[];
+}
+
 /**
  * In-memory queue management service
  * Uses EventEmitter to notify when queues pop
@@ -148,6 +156,90 @@ export class QueueService extends EventEmitter {
   }
 
   /**
+   * Cancel a queue scrim on behalf of an admin.
+   *
+   * Policy:
+   * - `checking_in`: only players who already checked in are returned to the queue.
+   * - `active`: every player in the scrim is returned to the queue.
+   * - No dodge penalties are applied. This is an operator override, not a timeout.
+   */
+  async cancelQueueScrim(scrimId: number): Promise<QueueScrimCancelResult> {
+    try {
+      const scrim = await scrimService.getById(scrimId);
+      if (!scrim) {
+        return {
+          success: false,
+          message: `Scrim ${scrimId} was not found.`,
+          scrimId,
+          restoredPlayerIds: [],
+        };
+      }
+
+      if (scrim.match_type !== 'QUEUE') {
+        return {
+          success: false,
+          message: `Scrim ${scrim.scrim_uid} is not a queue scrim.`,
+          scrimId,
+          scrimUid: scrim.scrim_uid,
+          restoredPlayerIds: [],
+        };
+      }
+
+      if (scrim.status === 'completed' || scrim.status === 'cancelled') {
+        return {
+          success: false,
+          message: `Scrim ${scrim.scrim_uid} is already ${scrim.status}.`,
+          scrimId,
+          scrimUid: scrim.scrim_uid,
+          restoredPlayerIds: [],
+        };
+      }
+
+      if (scrim.status !== 'checking_in' && scrim.status !== 'active') {
+        return {
+          success: false,
+          message: `Scrim ${scrim.scrim_uid} cannot be cancelled while it is ${scrim.status}.`,
+          scrimId,
+          scrimUid: scrim.scrim_uid,
+          restoredPlayerIds: [],
+        };
+      }
+
+      const scrimPlayers = await scrimService.getScrimPlayers(scrimId);
+      const playerIdsToRestore =
+        scrim.status === 'checking_in'
+          ? scrimPlayers.filter((scrimPlayer) => scrimPlayer.checked_in).map((scrimPlayer) => scrimPlayer.player_id)
+          : scrimPlayers.map((scrimPlayer) => scrimPlayer.player_id);
+
+      await scrimService.cancelScrim(scrimId);
+      const restoredPlayers = await this.restorePlayersToQueue(playerIdsToRestore);
+
+      logger.info('Admin cancelled queue scrim', {
+        scrimId,
+        scrimUid: scrim.scrim_uid,
+        status: scrim.status,
+        restoredCount: restoredPlayers.length,
+      });
+
+      return {
+        success: true,
+        message: `Cancelled scrim ${scrim.scrim_uid}. Returned ${restoredPlayers.length} player(s) to the queue.`,
+        scrimId,
+        scrimUid: scrim.scrim_uid,
+        restoredPlayerIds: restoredPlayers.map((player) => player.id),
+      };
+    } catch (error) {
+      logger.error('Error cancelling queue scrim:', { scrimId, error });
+      return {
+        success: false,
+        message: 'An error occurred while cancelling the scrim.',
+        scrimId,
+        restoredPlayerIds: [],
+      };
+    }
+  }
+
+  /**
    * Get queue status for all leagues
    */
   getQueueStatus(): Record<League, number> {
@@ -273,10 +365,7 @@ export class QueueService extends EventEmitter {
             .map((sp) => sp.player_id);
 
           if (checkedInPlayers.length > 0) {
-            const players = await playerService.getByIds(checkedInPlayers);
-            for (const player of players) {
-              await this.returnPlayerToQueue(player);
-            }
+            await this.restorePlayersToQueue(checkedInPlayers);
           }
 
           // Emit event for Discord notifications
@@ -310,6 +399,23 @@ export class QueueService extends EventEmitter {
       playerId: player.id,
       league: player.league,
     });
+  }
+
+  /**
+   * Restore one or more players to their queue with priority.
+   * This mirrors the check-in timeout behavior and is reused by admin cancellation.
+   */
+  private async restorePlayersToQueue(playerIds: number[]): Promise<Player[]> {
+    if (playerIds.length === 0) {
+      return [];
+    }
+
+    const players = await playerService.getByIds(playerIds);
+    for (const player of players) {
+      await this.returnPlayerToQueue(player);
+    }
+
+    return players;
   }
 
   /**

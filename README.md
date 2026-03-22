@@ -1,125 +1,36 @@
 # Trackmania Scrim Queue Bot
 
-A Discord bot for managing competitive Trackmania scrims on the MLE server. Handles matchmaking, map selection based on player history, and match result submission.
+Discord bot for running Trackmania league queues on the MLE server. It handles player registration through Sprocket, league-based queueing, scrim creation, check-ins, dodge penalties, and admin match operations.
 
-## Features
+## Start Here
 
-- **League-based queuing** - Separate queues for Academy, Champion, and Master leagues
-- **Smart map selection** - Selects 3 maps based on least-played history across all players
-- **Check-in system** - 5-minute check-in window with automatic dodge penalties
-- **Ban management** - Escalating penalties for queue dodging
-- **Google Apps Script integration** - Web app links for replay submission and verification
+- [Quick Start](docs/QUICKSTART.md) for setup and first run.
+- [How the Bot Works](docs/USING_THE_BOT.md) for the player and admin journeys.
+- [Command Reference](docs/COMMAND_REFERENCE.md) for the exact slash commands and status meanings.
+- [Testing](docs/TESTING.md) for unit vs integration test workflows.
+- [Discord Bot Invite Setup](docs/BOT_INVITE_SETUP.md) for OAuth and permission details.
 
-## Prerequisites
+## What The Bot Does
 
-- Node.js 20+
-- PostgreSQL 16+
-- Discord Bot Token
+- Puts players into their correct league queue based on their Sprocket Trackmania profile.
+- Pops a scrim when 4 players are available in the same league.
+- DMs players the scrim details, map list, check-in deadline, and result-submission link.
+- Applies dodge penalties when players miss check-in.
+- Supports scheduled league matches for admins.
+- Tracks bans, stats, and Elo processing for completed matches.
 
-## Quick Start
+## Operational Model
 
-### 1. Clone and Install
+The queue flow is intentionally simple:
 
-```bash
-npm install
-```
+`/queue join` -> match found -> 5-minute check-in window -> active match -> completed or cancelled.
 
-### 2. Configure Environment
+If you are administering the bot, the most useful pages are:
 
-Copy `.env.example` to `.env` and fill in your values:
+- [How the Bot Works](docs/USING_THE_BOT.md)
+- [Command Reference](docs/COMMAND_REFERENCE.md)
 
-```bash
-cp .env.example .env
-```
-
-Required configuration:
-- `DISCORD_BOT_TOKEN` - Your Discord bot token
-- `DISCORD_GUILD_ID` - Your Discord server ID
-- `DISCORD_CLIENT_ID` - Your Discord application client ID
-- `DATABASE_URL` - PostgreSQL connection string
-- `DATABASE_SCHEMA` - Bot schema name, normally `trackmania`
-- `APPSCRIPT_BASE_URL` - Deployed Google Apps Script web app URL ending in `/exec`
-
-### 3. Set Up Database
-
-```bash
-# Using Docker Compose (recommended for development)
-docker-compose up -d db
-
-# Or manually with PostgreSQL
-psql -U postgres -f db/schema.sql
-psql -U postgres -f db/seed.sql
-```
-
-### 4. Run the Bot
-
-```bash
-# Development mode with hot reload
-npm run dev
-
-# Production mode
-npm run build
-npm start
-```
-
-## Docker Deployment
-
-### Using Docker Compose
-
-```bash
-# Start all services (bot + database)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f bot
-
-# Stop services
-docker-compose down
-```
-
-### Building Docker Image
-
-```bash
-docker build -t tm-scrim-bot .
-docker run -d --env-file .env tm-scrim-bot
-```
-
-## Systemd Deployment
-
-1. Build the application:
-```bash
-npm run build
-```
-
-2. Copy files to deployment location:
-```bash
-sudo mkdir -p /opt/tm-scrim-bot
-sudo cp -r dist db node_modules package.json .env /opt/tm-scrim-bot/
-```
-
-3. Create user and set permissions:
-```bash
-sudo useradd -r -s /bin/false tmscrim
-sudo chown -R tmscrim:tmscrim /opt/tm-scrim-bot
-```
-
-4. Install and start service:
-```bash
-sudo cp systemd/tm-scrim-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable tm-scrim-bot
-sudo systemctl start tm-scrim-bot
-```
-
-5. Check status:
-```bash
-sudo systemctl status tm-scrim-bot
-sudo journalctl -u tm-scrim-bot -f
-```
-
-## Development
-
-### Project Structure
+## Requirements
 
 ```
 tm-scrim-bot/
@@ -199,11 +110,11 @@ Use the deployed Apps Script web app URL as:
 APPSCRIPT_BASE_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 ```
 
-The bot links players to:
-- `...?id=<SCRIM_UID>` for scrim upload/verification routing
-- additional query params for player names, maps, and timestamp
+## Files Worth Knowing
 
-Legacy Google Form environment variables are obsolete and should not be used.
+- `db/schema.sql` sets up the core tables.
+- `db/migrations/001_elo_and_stats.sql` adds Elo and match-stat tables.
+- `src/scripts/deploy-commands.ts` publishes the slash commands to Discord.
 
 ## License
 

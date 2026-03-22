@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { loadCommands, Command } from './utils/commandLoader.js';
 import { QueueEventHandler } from './handlers/queueEvents.js';
+import { handleCheckInButtonInteraction } from './handlers/checkinInteractions.js';
 
 export class DiscordBot {
   public client: Client;
@@ -13,6 +14,7 @@ export class DiscordBot {
       intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.DirectMessages,
       ],
     });
 
@@ -37,6 +39,11 @@ export class DiscordBot {
     });
 
     this.client.on(Events.InteractionCreate, async (interaction) => {
+      if (interaction.isButton()) {
+        await handleCheckInButtonInteraction(interaction);
+        return;
+      }
+
       if (!interaction.isChatInputCommand()) return;
 
       logger.debug(`Received command: ${interaction.commandName}`);
