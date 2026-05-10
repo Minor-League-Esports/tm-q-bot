@@ -11,6 +11,7 @@ import { scrimService } from '../services/scrim.service.js';
 import { eloService } from '../services/elo.service.js';
 import { matchAuditService, MatchAuditReport } from '../services/match-audit.service.js';
 import { rosterService } from '../services/roster.service.js';
+import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
 
@@ -161,6 +162,11 @@ export const data = new SlashCommandBuilder()
             { name: 'Master', value: 'Master' }
           )
       )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('backfill-identities')
+      .setDescription('Backfill local Trackmania players with Sprocket identity fields')
   )
   .addSubcommand(subcommand =>
     subcommand
@@ -317,6 +323,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             break;
           case 'elo':
             await handleElo(interaction);
+            break;
+          case 'backfill-identities':
+            await handleBackfillIdentities(interaction);
             break;
           case 'cancel-scrim':
             await handleCancelScrim(interaction);
@@ -555,7 +564,7 @@ async function handleRosterCommand(
         .setTitle(`Roster: ${franchise} - ${league}`)
         .setDescription(
           rows.length > 0
-            ? rows.map((row) => `${row.role_name}: ${row.discord_id ? `<@${row.discord_id}>` : 'Empty'} (slot ${row.slot_id})`).join('\n')
+            ? rows.map((row) => `${row.role_name}: ${formatRosterDisplayName(row)} (slot ${row.slot_id})`).join('\n')
             : 'No roster slots found.'
         )
         .setTimestamp();
@@ -927,6 +936,49 @@ function buildAuditEmbed(report: MatchAuditReport) {
   });
 
   return embed.setTimestamp();
+}
+
+async function handleBackfillIdentities(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const issues = await identityBackfillService.backfillTrackmaniaPlayerIdentities();
+  const missing = issues.filter((issue) => issue.reason === 'missing_sprocket_profile');
+  const duplicates = issues.filter((issue) => issue.reason === 'duplicate_sprocket_profiles');
+
+  const embed = new EmbedBuilder()
+    .setColor(issues.length === 0 ? 0x00aa55 : 0xff9900)
+    .setTitle('Trackmania Identity Backfill')
+    .setDescription(
+      issues.length === 0
+        ? 'Backfill completed successfully. No missing or duplicate Sprocket profiles were found.'
+        : `Backfill completed with ${issues.length} issue(s). Missing: ${missing.length}. Duplicates: ${duplicates.length}.`
+    )
+    .setTimestamp();
+
+  if (issues.length > 0) {
+    embed.addFields({
+      name: 'Issues',
+      value: issues
+        .slice(0, 10)
+        .map((issue) => {
+          const profileIds = issue.sprocket_player_ids.length > 0 ? issue.sprocket_player_ids.join(', ') : 'none';
+          return `${issue.discord_username} (${issue.discord_id}) local ${issue.local_player_id}: ${issue.reason}; Sprocket profiles: ${profileIds}`;
+        })
+        .join('\n')
+        .slice(0, 1024),
+      inline: false,
+    });
+  }
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+function formatRosterDisplayName(row: { discord_id: string | null; discord_username?: string | null; player_id: number | null }) {
+  if (!row.player_id) {
+    return 'Empty';
+  }
+
+  return row.discord_username || row.discord_id || `Sprocket player ${row.player_id}`;
 }
 
 async function handleCancelScrim(interaction: ChatInputCommandInteraction) {

@@ -14,6 +14,7 @@ export interface RosterSlotRow {
   player_id: number | null;
   member_id: number | null;
   discord_id: string | null;
+  discord_username: string | null;
 }
 
 interface IdRow {
@@ -97,7 +98,8 @@ export class RosterService {
         rr.name AS role_name,
         rs."playerId" AS player_id,
         m.id AS member_id,
-        uaa."accountId" AS discord_id
+        uaa."accountId" AS discord_id,
+        COALESCE(tm_player.discord_username, m.name) AS discord_username
       FROM sprocket.roster_slot rs
       JOIN sprocket.team t ON t.id = rs."teamId"
       JOIN sprocket.franchise f ON f.id = t."franchiseId"
@@ -108,6 +110,7 @@ export class RosterService {
       LEFT JOIN sprocket.user_authentication_account uaa
         ON uaa."userId" = u.id
        AND uaa."accountType" = 'DISCORD'
+      LEFT JOIN trackmania.players tm_player ON tm_player.sprocket_player_id = p.id
       WHERE t."skillGroupId" = $1
         AND (LOWER(f.name) = LOWER($2) OR LOWER(f.code) = LOWER($2) OR f.id::TEXT = $2)
       ORDER BY rr.name, rs.id

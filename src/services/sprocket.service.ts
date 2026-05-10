@@ -82,6 +82,7 @@ export class SprocketService {
           AND uaa."accountId" = $1
           AND g.title = 'Trackmania'
         GROUP BY p.id, m.id, uaa."accountId", gsg.id, gsgp.code, gsgp.description
+        ORDER BY gsg.id, p.id
         LIMIT 1
         `,
         [discordId],
@@ -126,6 +127,7 @@ export class SprocketService {
         WHERE lookup_mpa."platformAccountId" = $1
           AND g.title = 'Trackmania'
         GROUP BY p.id, m.id, uaa."accountId", gsg.id, gsgp.code, gsgp.description
+        ORDER BY gsg.id, p.id
         LIMIT 1
         `,
         [platformAccountId],
@@ -207,6 +209,21 @@ export class SprocketService {
     const skillGroupId = await this.getSkillGroupIdForLeague(league);
     if (!skillGroupId) {
       throw new Error(`No Trackmania skill group configured for league ${league}`);
+    }
+
+    if (fixtureId !== undefined) {
+      const fixtureResult = await client.query<{ skillGroupId: number }>(
+        `
+        SELECT "skillGroupId" AS "skillGroupId"
+        FROM sprocket.schedule_fixture
+        WHERE id = $1
+        `,
+        [fixtureId],
+      );
+      const fixtureSkillGroupId = fixtureResult.rows[0]?.skillGroupId;
+      if (fixtureSkillGroupId !== skillGroupId) {
+        throw new Error(`Fixture ${fixtureId} does not belong to the Trackmania ${league} skill group`);
+      }
     }
 
     const scrimMetaResult = await client.query<InsertIdRow>(

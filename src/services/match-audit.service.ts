@@ -259,7 +259,7 @@ export class MatchAuditService {
         eligibility_present: eligibilityResult.rows.length >= playersResult.rows.length,
         elo_ready: scrim.status === 'completed' && scrim.winner_team !== null,
         elo_processed_once:
-          !scrim.elo_processed || eloHistoryResult.rows.length === playersResult.rows.length,
+          scrim.elo_processed === (eloHistoryResult.rows.length === playersResult.rows.length),
       },
     };
 
