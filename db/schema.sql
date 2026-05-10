@@ -9,12 +9,18 @@ CREATE TABLE IF NOT EXISTS players (
   discord_id VARCHAR(20) UNIQUE NOT NULL,
   discord_username VARCHAR(255) NOT NULL,
   league VARCHAR(50) NOT NULL CHECK (league IN ('Academy', 'Champion', 'Master')),
+  sprocket_player_id INTEGER UNIQUE,
+  member_id INTEGER,
+  platform_account_ids VARCHAR[] DEFAULT ARRAY[]::VARCHAR[],
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX idx_players_discord_id ON players(discord_id);
 CREATE INDEX idx_players_league ON players(league);
+CREATE INDEX idx_players_sprocket_player_id ON players(sprocket_player_id) WHERE sprocket_player_id IS NOT NULL;
+CREATE INDEX idx_players_member_id ON players(member_id) WHERE member_id IS NOT NULL;
+CREATE INDEX idx_players_platform_account_ids ON players USING GIN(platform_account_ids);
 
 -- Queue bans table
 CREATE TABLE IF NOT EXISTS queue_bans (

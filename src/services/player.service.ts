@@ -144,19 +144,43 @@ export class PlayerService {
           `UPDATE ${this.playersTable}
            SET discord_username = $2,
                league = $3,
+               sprocket_player_id = $4,
+               member_id = $5,
+               platform_account_ids = $6,
                updated_at = NOW()
            WHERE discord_id = $1
            RETURNING *`,
-          [discordId, discordUsername, league],
+          [
+            discordId,
+            discordUsername,
+            league,
+            profile.sprocket_player_id,
+            profile.member_id,
+            profile.platform_accounts,
+          ],
         );
         return result.rows[0] || existing;
       }
 
       const result = await db.query<Player>(
-        `INSERT INTO ${this.playersTable} (discord_id, discord_username, league)
-         VALUES ($1, $2, $3)
+        `INSERT INTO ${this.playersTable} (
+           discord_id,
+           discord_username,
+           league,
+           sprocket_player_id,
+           member_id,
+           platform_account_ids
+         )
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [discordId, discordUsername, league],
+        [
+          discordId,
+          discordUsername,
+          league,
+          profile.sprocket_player_id,
+          profile.member_id,
+          profile.platform_accounts,
+        ],
       );
       return result.rows[0] || null;
     } catch (error) {
