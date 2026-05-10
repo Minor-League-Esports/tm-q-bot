@@ -1,4 +1,3 @@
-import { db } from '../db/index.js';
 import { League } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { sprocketService } from './sprocket.service.js';

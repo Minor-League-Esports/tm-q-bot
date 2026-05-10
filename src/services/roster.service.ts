@@ -20,6 +20,10 @@ interface IdRow {
   id: number;
 }
 
+type DbClient = {
+  query: <T = IdRow>(text: string, params?: unknown[]) => Promise<{ rows: T[]; rowCount?: number | null }>;
+};
+
 export class RosterService {
   async addPlayer(discordId: string, franchise: string, slot: string, league: League): Promise<RosterSlotRow> {
     const profile = await sprocketService.getTrackmaniaProfileByDiscordId(discordId);
@@ -114,7 +118,7 @@ export class RosterService {
     return result.rows;
   }
 
-  private async resolveTeamId(client: any, franchise: string, league: League): Promise<number> {
+  private async resolveTeamId(client: DbClient, franchise: string, league: League): Promise<number> {
     const skillGroupId = await sprocketService.getSkillGroupIdForLeague(league);
     if (!skillGroupId) {
       throw new Error(`No Trackmania skill group configured for league ${league}`);
@@ -140,7 +144,7 @@ export class RosterService {
     return result.rows[0].id;
   }
 
-  private async resolveRosterRoleId(client: any, slot: string, league: League): Promise<number> {
+  private async resolveRosterRoleId(client: DbClient, slot: string, league: League): Promise<number> {
     const skillGroupId = await sprocketService.getSkillGroupIdForLeague(league);
     if (!skillGroupId) {
       throw new Error(`No Trackmania skill group configured for league ${league}`);
@@ -165,7 +169,7 @@ export class RosterService {
     return result.rows[0].id;
   }
 
-  private async resolveRosterSlotId(client: any, teamId: number, roleId: number): Promise<number> {
+  private async resolveRosterSlotId(client: DbClient, teamId: number, roleId: number): Promise<number> {
     const result = await client.query<IdRow>(
       `
       SELECT id
