@@ -113,7 +113,7 @@ export class MapService {
       const mapPlayCounts = await this.getMapPlayCounts(playerIds);
 
       if (mapPlayCounts.length === 0) {
-        throw new Error('No active maps available');
+        throw new Error(`No active maps available in ${this.mapsTable}`);
       }
 
       if (mapPlayCounts.length < count) {

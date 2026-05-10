@@ -50,6 +50,8 @@ DODGE_BAN_3=7200
 LEAGUES=Academy,Champion,Master
 ```
 
+The Google Apps Script source for the replay submission flow now lives in `parser/` in this repo. Deploy that folder as your Apps Script project, then set `APPSCRIPT_BASE_URL` to the deployed web app URL.
+
 ## 4. Set Up The Database
 
 Create the schema, then add the Elo/stat migration if you want match completion and rating processing:

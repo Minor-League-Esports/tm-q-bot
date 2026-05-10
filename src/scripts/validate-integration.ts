@@ -8,7 +8,7 @@ interface TableRow {
 }
 
 function resolveParserPath(...parts: string[]) {
-  return path.resolve(process.cwd(), '..', 'parser', ...parts);
+  return path.resolve(process.cwd(), 'parser', ...parts);
 }
 
 function readIfExists(filePath: string): string | null {
@@ -109,7 +109,7 @@ async function main() {
   console.log('');
 
   console.log('Parser');
-  console.log(`- Parser repo present: ${statusLabel(parserPresent)}`);
+  console.log(`- In-repo parser present: ${statusLabel(parserPresent)}`);
   console.log(`- Replay payload captures per-driver account id: ${statusLabel(parserCapturesReplayAccountId)}`);
   console.log(`- Repository still matches players by discord username: ${statusLabel(parserUsesDiscordUsernameLookup)}`);
   console.log(`- Repository matches players by platform account id: ${statusLabel(parserUsesPlatformAccountLookup)}`);

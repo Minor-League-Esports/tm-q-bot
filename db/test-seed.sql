@@ -1,5 +1,8 @@
 -- Test Seed Data
 
+CREATE SCHEMA IF NOT EXISTS public;
+SET search_path TO public;
+
 -- Insert 4 Academy Players
 INSERT INTO players (discord_id, discord_username, league) VALUES
 ('test_discord_id_1', 'TestPlayer1', 'Academy'),

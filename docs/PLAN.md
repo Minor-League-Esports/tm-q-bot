@@ -33,7 +33,7 @@ The bot needs a service to handle Elo calculations and updates.
 
 ## 3. GAS Parser Integration
 
-The Google Apps Script needs to write directly to the PostgreSQL database.
+The Google Apps Script in `parser/` writes directly to the PostgreSQL database.
 
 ### Components
 - **`Database.gs`**: A helper class to manage JDBC connections to your PostgreSQL database.

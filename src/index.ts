@@ -19,9 +19,10 @@ async function main() {
   // Initialize bot
   const bot = new DiscordBot();
 
-  // Load commands
+  // Load command handlers for interactions. Discord registration is handled by
+  // the separate deploy-commands script.
   await bot.loadCommands();
-  logger.info('Commands loaded successfully');
+  logger.info('Command handlers loaded successfully');
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {

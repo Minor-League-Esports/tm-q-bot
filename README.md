@@ -42,6 +42,7 @@ If you are administering the bot, the most useful pages are:
 
 - `db/schema.sql` sets up the core tables.
 - `db/migrations/001_elo_and_stats.sql` adds Elo and match-stat tables.
+- `parser/` contains the bundled Google Apps Script replay parser and verifier.
 - `src/scripts/deploy-commands.ts` publishes the slash commands to Discord.
 
 ## License

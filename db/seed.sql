@@ -1,5 +1,8 @@
 -- Sample data for development and testing
 
+CREATE SCHEMA IF NOT EXISTS trackmania;
+SET search_path TO trackmania, public;
+
 -- Sample maps (typical Trackmania campaign maps)
 INSERT INTO maps (name, uid, author, is_active) VALUES
 ('Trial of the Fool', 'TM_TRIAL_01_AAAA', 'Nadeo', true),
