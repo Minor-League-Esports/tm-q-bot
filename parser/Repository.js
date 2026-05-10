@@ -99,59 +99,88 @@ var Repository = (function () {
    * @param {Object} parsedMap - The parsed map data
    * @param {number} winnerTeam - 1 or 2
    */
-  function saveMatchResults(scrimId, parsedMap, winnerTeam) {
+  function saveMatchResults(scrimId, parsedMaps, winnerTeam) {
     var conn = Database.getConnection();
     conn.setAutoCommit(false);
 
     try {
-      // 1. Update Scrim Status
+      var mapsToSave = Array.isArray(parsedMaps) ? parsedMaps : [parsedMaps];
+
+      var scrimCheck = conn.prepareStatement(
+        'SELECT status, elo_processed FROM "' + APP_SCHEMA + '".scrims WHERE id = ? FOR UPDATE'
+      );
+      scrimCheck.setInt(1, scrimId);
+      var scrimRs = scrimCheck.executeQuery();
+      if (!scrimRs.next()) {
+        throw new Error("Scrim not found for verification.");
+      }
+      var currentStatus = scrimRs.getString("status");
+      var eloProcessed = scrimRs.getBoolean("elo_processed");
+      scrimRs.close();
+      scrimCheck.close();
+
+      if (currentStatus === "completed" && eloProcessed) {
+        conn.rollback();
+        return { alreadyProcessed: true, insertedStats: 0 };
+      }
+
+      // 1. Update Scrim Status once using cumulative match winner
       var updateScrim = conn.prepareStatement(
         'UPDATE "' +
           APP_SCHEMA +
-          "\".scrims SET status = 'completed', completed_at = NOW(), winner_team = ? WHERE id = ?"
+          '".scrims SET status = \'completed\', completed_at = COALESCE(completed_at, NOW()), winner_team = ? WHERE id = ?'
       );
       updateScrim.setInt(1, winnerTeam);
       updateScrim.setInt(2, scrimId);
       updateScrim.executeUpdate();
+      updateScrim.close();
 
-      // 2. Insert Match Player Stats
+      // 2. Insert Match Player Stats idempotently
       var insertStats = conn.prepareStatement(
         'INSERT INTO "' +
           APP_SCHEMA +
           '".match_player_stats ' +
-          "(scrim_id, map_id, player_id, team_id, points, is_finished, is_dnf, nb_respawns, best_time) " +
+          "(scrim_id, map_id, player_id, team_id, points, is_finished, is_dnf, round_points, nb_respawns, respawn_times, best_time, cp_times, respawn_time_loss, nb_respawns_by_cp) " +
           'VALUES (?, (SELECT id FROM "' +
           APP_SCHEMA +
-          '".maps WHERE uid = ? LIMIT 1), ?, ?, ?, ?, ?, ?, ?)'
+          '".maps WHERE uid = ? LIMIT 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
+          'ON CONFLICT (scrim_id, COALESCE(map_id, 0), player_id) DO NOTHING'
       );
 
       var unresolvedDrivers = [];
+      var insertedStats = 0;
 
-      parsedMap.driverPlacements.forEach(function (driver) {
-        var player = findTrackmaniaPlayer(conn, driver.id, driver.name);
-        if (!player || !player.localPlayerId || !player.sprocketPlayerId) {
-          unresolvedDrivers.push(
-            (driver.name || "Unknown") +
-              (driver.id ? " [" + driver.id + "]" : "")
-          );
-          return;
-        }
+      mapsToSave.forEach(function (parsedMap) {
+        parsedMap.driverPlacements.forEach(function (driver) {
+          var player = findTrackmaniaPlayer(conn, driver.id, driver.name);
+          if (!player || !player.localPlayerId || !player.sprocketPlayerId) {
+            unresolvedDrivers.push(
+              (driver.name || "Unknown") +
+                (driver.id ? " [" + driver.id + "]" : "")
+            );
+            return;
+          }
 
-        insertStats.setInt(1, scrimId);
-        insertStats.setString(2, parsedMap.mapId || "");
-        insertStats.setInt(3, player.localPlayerId);
-        insertStats.setInt(4, parseInt(driver.team));
-        insertStats.setInt(5, driver.points);
-        insertStats.setBoolean(6, driver.status === "Finished");
-        insertStats.setBoolean(7, driver.status === "DNF");
-        insertStats.setInt(8, driver.nbRespawns);
+          insertStats.setInt(1, scrimId);
+          insertStats.setString(2, parsedMap.mapId || "");
+          insertStats.setInt(3, player.localPlayerId);
+          insertStats.setInt(4, parseInt(driver.team));
+          insertStats.setInt(5, driver.points);
+          insertStats.setBoolean(6, driver.status === "Finished");
+          insertStats.setBoolean(7, driver.status === "DNF");
+          insertStats.setArray(8, conn.createArrayOf("integer", driver.roundPoints || []));
+          insertStats.setInt(9, driver.nbRespawns || 0);
+          insertStats.setArray(10, conn.createArrayOf("integer", driver.respawnTimes || []));
 
-        // Handle bestTime (might be string or number)
-        var bestTime =
-          typeof driver.bestTime === "number" ? driver.bestTime : 0;
-        insertStats.setInt(9, bestTime);
+          var bestTime = typeof driver.bestTime === "number" ? driver.bestTime : 0;
+          insertStats.setInt(11, bestTime);
+          insertStats.setArray(12, conn.createArrayOf("integer", driver.cpTimes || []));
+          insertStats.setArray(13, conn.createArrayOf("integer", driver.respawnTimeLoss || []));
+          insertStats.setArray(14, conn.createArrayOf("integer", [driver.nbRespawnsByCP || 0]));
 
-        insertStats.addBatch();
+          insertStats.addBatch();
+          insertedStats++;
+        });
       });
 
       if (unresolvedDrivers.length > 0) {
@@ -162,9 +191,10 @@ var Repository = (function () {
       }
 
       insertStats.executeBatch();
+      insertStats.close();
 
       conn.commit();
-      return true;
+      return { alreadyProcessed: false, insertedStats: insertedStats };
     } catch (e) {
       conn.rollback();
       Logger.log("Error saving match results: " + e.message);

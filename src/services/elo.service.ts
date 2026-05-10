@@ -141,6 +141,49 @@ export class EloService {
         }
     }
 
+    async getPlayerEloSummary(playerId: number, league?: League): Promise<{
+        ratings: EloRating[];
+        history: Array<{
+            scrim_id: number;
+            scrim_uid: string;
+            old_rating: number;
+            new_rating: number;
+            change_amount: number;
+            created_at: Date;
+        }>;
+    }> {
+        const params: unknown[] = [playerId];
+        const leagueFilter = league ? `AND er.league = $${params.push(league)}` : '';
+        const ratingsResult = await db.query<EloRating>(
+            `SELECT * FROM ${this.eloRatingsTable} er WHERE er.player_id = $1 ${leagueFilter} ORDER BY er.league`,
+            params
+        );
+
+        const historyParams: unknown[] = [playerId];
+        const historyLeagueFilter = league ? `AND s.league = $${historyParams.push(league)}` : '';
+        const historyResult = await db.query<{
+            scrim_id: number;
+            scrim_uid: string;
+            old_rating: number;
+            new_rating: number;
+            change_amount: number;
+            created_at: Date;
+        }>(
+            `SELECT eh.scrim_id, s.scrim_uid, eh.old_rating, eh.new_rating, eh.change_amount, eh.created_at
+             FROM ${this.eloHistoryTable} eh
+             JOIN ${this.scrimsTable} s ON s.id = eh.scrim_id
+             WHERE eh.player_id = $1 ${historyLeagueFilter}
+             ORDER BY eh.created_at DESC
+             LIMIT 20`,
+            historyParams
+        );
+
+        return {
+            ratings: ratingsResult.rows,
+            history: historyResult.rows,
+        };
+    }
+
     private async updatePlayerRating(
         client: any,
         playerId: number,
@@ -174,7 +217,8 @@ export class EloService {
         // Insert History
         await client.query(
             `INSERT INTO ${this.eloHistoryTable} (player_id, scrim_id, old_rating, new_rating)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT DO NOTHING`,
             [playerId, scrimId, currentRating.rating, newRating]
         );
     }

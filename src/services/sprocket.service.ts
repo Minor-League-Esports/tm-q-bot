@@ -202,6 +202,7 @@ export class SprocketService {
     client: { query: <T = InsertIdRow>(text: string, params?: unknown[]) => Promise<{ rows: T[] }> },
     league: League,
     submissionId: string,
+    fixtureId?: number,
   ): Promise<{ matchParentId: number; matchId: number }> {
     const skillGroupId = await this.getSkillGroupIdForLeague(league);
     if (!skillGroupId) {
@@ -219,11 +220,11 @@ export class SprocketService {
 
     const matchParentResult = await client.query<InsertIdRow>(
       `
-      INSERT INTO sprocket.match_parent ("scrimMetaId")
-      VALUES ($1)
+      INSERT INTO sprocket.match_parent ("scrimMetaId", "fixtureId")
+      VALUES ($1, $2)
       RETURNING id
       `,
-      [scrimMetaId],
+      [scrimMetaId, fixtureId ?? null],
     );
     const matchParentId = matchParentResult.rows[0]?.id;
 

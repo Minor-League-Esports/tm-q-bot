@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { randomUUID } from 'crypto';
 import { sprocketService } from './sprocket.service.js';
 import { UrlGenerator } from '../utils/urlGenerator.js';
+import { fixtureService } from './fixture.service.js';
 
 export interface AdminScrimDetail {
   scrim: Scrim;
@@ -24,6 +25,14 @@ interface AdminScrimQueryOptions {
   matchType?: MatchType;
   statuses?: ScrimStatus[];
   limit?: number;
+}
+
+export interface CreateScheduledMatchOptions {
+  fixtureId?: number;
+  homeFranchise?: string;
+  awayFranchise?: string;
+  scheduleGroupId?: number;
+  week?: number;
 }
 
 export class ScrimService {
@@ -113,7 +122,8 @@ export class ScrimService {
    */
   async createScheduledMatch(
     league: League,
-    players: Player[]
+    players: Player[],
+    options: CreateScheduledMatchOptions = {}
   ): Promise<Scrim> {
     if (players.length !== 4) {
       throw new Error('Match must have exactly 4 players');
@@ -125,7 +135,23 @@ export class ScrimService {
 
       // Generate unique scrim ID
       const scrimUid = this.generateScrimId();
-      const sprocketMatch = await sprocketService.createMatchParentAndMatch(client, league, scrimUid);
+      const fixture = options.fixtureId
+        ? await fixtureService.resolveFixture(client, options.fixtureId, league)
+        : options.homeFranchise && options.awayFranchise
+          ? await fixtureService.getOrCreateTestFixture(client, {
+              league,
+              homeFranchise: options.homeFranchise,
+              awayFranchise: options.awayFranchise,
+              scheduleGroupId: options.scheduleGroupId,
+              week: options.week,
+            })
+          : null;
+      const sprocketMatch = await sprocketService.createMatchParentAndMatch(
+        client,
+        league,
+        scrimUid,
+        fixture?.fixtureId
+      );
 
       // Create scrim with SCHEDULED type and ACTIVE status (no check-in needed)
       const scrimResult = await client.query<Scrim>(
@@ -153,6 +179,7 @@ export class ScrimService {
         scrimId: scrim.id,
         scrimUid,
         league,
+        fixtureId: fixture?.fixtureId ?? null,
         playerIds: players.map(p => p.id)
       });
 
