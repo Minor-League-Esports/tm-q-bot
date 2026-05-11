@@ -16,42 +16,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Install clasp
-        run: npm install -g @google/clasp
+          node-version: 24
 
       - name: Create clasp config
         run: |
-          echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > parser/.clasp.json
+          echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > .clasp.json
 
       - name: Authenticate clasp
         env:
           CLASPRC_CONTENT: ${{ secrets.GAS_CLASPRC_JSON }}
         run: |
           printf '%s' "$CLASPRC_CONTENT" > ~/.clasprc.json
-          chmod 600 ~/.clasprc.json
-
-      - name: Validate credentials file
-        run: |
-          if [ ! -f ~/.clasprc.json ]; then
-            echo "::error::~/.clasprc.json was not created"
-            exit 1
-          fi
-          SIZE=$(wc -c < ~/.clasprc.json)
-          echo "Credentials file size: $SIZE bytes"
-          if [ "$SIZE" -lt 100 ]; then
-            echo "::warning::Credentials file seems too small ($SIZE bytes), may be invalid"
-          fi
-          # Verify it's valid JSON
-          if ! python3 -c "import json; json.load(open('$HOME/.clasprc.json'))" 2>/dev/null; then
-            echo "::error::~/.clasprc.json is not valid JSON"
-            exit 1
-          fi
-          echo "Credentials file is valid JSON"
+          chmod 644 ~/.clasprc.json
 
       - name: Push code to Apps Script
-        run: clasp push --force
+        run: npx @google/clasp push --force
         working-directory: parser
         env:
           CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
