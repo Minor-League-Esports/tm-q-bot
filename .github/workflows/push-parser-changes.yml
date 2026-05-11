@@ -22,14 +22,6 @@ jobs:
         run: |
           echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > .clasp.json
 
-      - name: Authenticate clasp
-        env:
-          CLASPRC_CONTENT: ${{ secrets.GAS_CLASPRC_JSON }}
-          HOME: ${{ github.workspace }}
-        run: |
-          printf '%s' "$CLASPRC_CONTENT" > ~/.clasprc.json
-          chmod 644 ~/.clasprc.json
-
       - name: Push code to Parser sheet/script
         uses: daikikatsuragawa/clasp-action@v1.1.0
         with:
