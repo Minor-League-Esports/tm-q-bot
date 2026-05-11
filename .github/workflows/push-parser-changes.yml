@@ -16,35 +16,26 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
 
-      - name: Create clasp config
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Create .clasp.json
         run: |
-          pwd
-          echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > parser/.clasp.json
-          ls -al parser/
+          printf '%s' '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":""}' > parser/.clasp.json
 
-      - name: Push code to Parser sheet/script
-        uses: daikikatsuragawa/clasp-action@v1.1.0
-        with:
-          accessToken: ${{ secrets.ACCESS_TOKEN }}
-          idToken: ${{ secrets.ID_TOKEN }}
-          refreshToken: ${{ secrets.REFRESH_TOKEN }}
-          clientId: ${{ secrets.CLIENT_ID }}
-          clientSecret: ${{ secrets.CLIENT_SECRET }}
-          scriptId: ${{ secrets.SCRIPT_ID }}
-          command: 'push'
-          rootDir: '/github/workspace/parser/'
+      - name: Write clasp credentials
+        env:
+          CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
+        run: |
+          mkdir -p ~/.clasp
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
 
-      - name: Push code to Parser sheet/script
-        uses: daikikatsuragawa/clasp-action@v1.1.0
-        with:
-          accessToken: ${{ secrets.ACCESS_TOKEN }}
-          idToken: ${{ secrets.ID_TOKEN }}
-          refreshToken: ${{ secrets.REFRESH_TOKEN }}
-          clientId: ${{ secrets.CLIENT_ID }}
-          clientSecret: ${{ secrets.CLIENT_SECRET }}
-          scriptId: ${{ secrets.SCRIPT_ID }}
-          command: 'deploy'
-          rootDir: 'parser'
-          description: 'Deploy ${{ github.sha }}'
+      - name: Push code to Apps Script
+        working-directory: parser
+        run: clasp push -f
+
+      - name: Deploy new version
+        working-directory: parser
+        run: clasp deploy --description "Deploy ${{ github.sha }}" -i ${{ secrets.DEPLOY_ID }}
