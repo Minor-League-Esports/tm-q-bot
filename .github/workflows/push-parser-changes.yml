@@ -31,8 +31,6 @@ jobs:
           chmod 644 ~/.clasprc.json
 
       - name: Push code to Apps Script
-        env:
-          HOME: ${{ github.workspace }}
         run: |
           echo $CLASPRC_JSON
           cat ~/.clasprc.json
@@ -40,6 +38,7 @@ jobs:
         working-directory: parser
         env:
           CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
+          HOME: ${{ github.workspace }}
 
       - name: Create new deployment
         run: clasp deploy --description "Deploy ${{ github.sha }}"
