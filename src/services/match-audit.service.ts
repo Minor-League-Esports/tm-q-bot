@@ -168,7 +168,7 @@ export class MatchAuditService {
         ON mps.scrim_id = sp.scrim_id
        AND mps.player_id = sp.player_id
       WHERE sp.scrim_id = $1
-      GROUP BY p.id, p.discord_id, p.discord_username, p.sprocket_player_id, p.member_id, p.platform_account_ids, sp.checked_in
+      GROUP BY sp.id, p.id, p.discord_id, p.discord_username, p.sprocket_player_id, p.member_id, p.platform_account_ids, sp.checked_in
       ORDER BY sp.id
       `,
       [scrim.id]
