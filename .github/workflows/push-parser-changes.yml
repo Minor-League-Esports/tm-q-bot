@@ -20,7 +20,9 @@ jobs:
 
       - name: Create clasp config
         run: |
+          pwd
           echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > parser/.clasp.json
+          ls parser/
 
       - name: Push code to Parser sheet/script
         uses: daikikatsuragawa/clasp-action@v1.1.0
