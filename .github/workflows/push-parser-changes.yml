@@ -25,8 +25,11 @@ jobs:
           echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > parser/.clasp.json
 
       - name: Authenticate clasp
+        env:
+          CLASPRC_CONTENT: ${{ secrets.GAS_CLASPRC_JSON }}
         run: |
-          echo '${{ secrets.GAS_CLASPRC_JSON }}' > ~/.clasprc.json
+          printf '%s' "$CLASPRC_CONTENT" > ~/.clasprc.json
+          chmod 600 ~/.clasprc.json
 
       - name: Push code to Apps Script
         run: clasp push --force
