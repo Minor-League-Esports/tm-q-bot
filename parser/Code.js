@@ -1046,6 +1046,17 @@ function verifyReplay(data) {
       const rowNum = i + 1;
       const mapEntry = tempValues[i];
 
+      // Ensure verifier is acting on the intended scrim from the submission URL.
+      var submittedScrimUid = String(mapEntry[10] || '').trim();
+      if (!submittedScrimUid) {
+        return { success: false, message: "❌ Submission is missing its Scrim UID." };
+      }
+
+      var intendedScrim = Repository.getScrimByUid(submittedScrimUid);
+      if (!intendedScrim || Number(intendedScrim.id) !== Number(data.scrimId)) {
+        return { success: false, message: "❌ Replay does not match the intended scrim." };
+      }
+
       // 1. Update Temp Submissions verification status
       tempSheet.getRange(rowNum, 7).setValue(data.verifiedBy); // G: Verified By
       tempSheet.getRange(rowNum, 8).setValue("✅ Verified"); // H: Verified
@@ -1063,19 +1074,33 @@ function verifyReplay(data) {
       // *** Parse ALL maps from the JSON data ***
       const allParsedMaps = ParseAllReplayMaps(jsonData);
 
-      // --- Loop over all maps to save to DB ---
-      for (const parsed of allParsedMaps) {
-        if (!parsed) continue;
+      var cumulativeScores = { 1: 0, 2: 0 };
+      allParsedMaps.forEach(function (parsed) {
+        var mapScores = calculateMapScores(parsed.driverPlacements);
+        mapScores.forEach(function (score) {
+          var teamNumber = parseInt(score.teamName);
+          if (teamNumber === 1 || teamNumber === 2) {
+            cumulativeScores[teamNumber] += score.totalPoints;
+          }
+        });
+      });
 
-        const mapScores = calculateMapScores(parsed.driverPlacements);
-        const winningTeamNumber = mapScores[0].teamName; // "1" or "2"
+      if (cumulativeScores[1] === cumulativeScores[2]) {
+        return { success: false, message: "❌ Cannot verify a tied cumulative match score." };
+      }
 
-        // Save to Database
-        Repository.saveMatchResults(
-          data.scrimId,
-          parsed,
-          parseInt(winningTeamNumber)
-        );
+      var winningTeamNumber = cumulativeScores[1] > cumulativeScores[2] ? 1 : 2;
+      var saveResult = Repository.saveMatchResults(
+        data.scrimId,
+        allParsedMaps,
+        winningTeamNumber
+      );
+
+      if (saveResult.alreadyProcessed) {
+        return {
+          success: true,
+          message: "Match was already completed and Elo processed; no duplicate rows were written.",
+        };
       }
 
       Repository.awardEligibilityPoints(data.scrimId, 3);
@@ -1089,7 +1114,7 @@ function verifyReplay(data) {
 
       return {
         success: true,
-        message: `✅ Verification successful! Data for ${allParsedMaps.length} map(s) saved to database.`,
+        message: `Verification successful! Data for ${allParsedMaps.length} map(s) saved to database. Match winner: Team ${winningTeamNumber}.`,
         mapName: loggedMap.mapName,
       };
     }

@@ -9,6 +9,9 @@ import { banService } from '../services/ban.service.js';
 import { playerService } from '../services/player.service.js';
 import { scrimService } from '../services/scrim.service.js';
 import { eloService } from '../services/elo.service.js';
+import { matchAuditService, MatchAuditReport } from '../services/match-audit.service.js';
+import { rosterService } from '../services/roster.service.js';
+import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
 
@@ -106,10 +109,15 @@ export const data = new SlashCommandBuilder()
             { name: 'Master', value: 'Master' }
           )
       )
-      .addUserOption(option => option.setName('p1').setDescription('Player 1').setRequired(true))
-      .addUserOption(option => option.setName('p2').setDescription('Player 2').setRequired(true))
-      .addUserOption(option => option.setName('p3').setDescription('Player 3').setRequired(true))
-      .addUserOption(option => option.setName('p4').setDescription('Player 4').setRequired(true))
+      .addUserOption(option => option.setName('p1').setDescription('Home player 1').setRequired(true))
+      .addUserOption(option => option.setName('p2').setDescription('Home player 2').setRequired(true))
+      .addUserOption(option => option.setName('p3').setDescription('Away player 1').setRequired(true))
+      .addUserOption(option => option.setName('p4').setDescription('Away player 2').setRequired(true))
+      .addIntegerOption(option => option.setName('fixture_id').setDescription('Existing Sprocket fixture ID').setRequired(false))
+      .addStringOption(option => option.setName('home_franchise').setDescription('Home franchise name/code for a test fixture').setRequired(false))
+      .addStringOption(option => option.setName('away_franchise').setDescription('Away franchise name/code for a test fixture').setRequired(false))
+      .addIntegerOption(option => option.setName('schedule_group_id').setDescription('Optional Sprocket schedule group ID').setRequired(false))
+      .addIntegerOption(option => option.setName('week').setDescription('Optional week for Trackmania Test schedule group').setRequired(false))
   )
   .addSubcommand(subcommand =>
     subcommand
@@ -124,6 +132,44 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand(subcommand =>
     subcommand
+      .setName('audit-match')
+      .setDescription('Audit a Trackmania scrim result and Sprocket linkage')
+      .addStringOption(option =>
+        option
+          .setName('scrim_id')
+          .setDescription('The Scrim ID (UUID) to audit')
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('elo')
+      .setDescription('Inspect current Elo and recent Elo history for a player')
+      .addUserOption(option =>
+        option
+          .setName('player')
+          .setDescription('The player to inspect')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option
+          .setName('league')
+          .setDescription('Optional league filter')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Academy', value: 'Academy' },
+            { name: 'Champion', value: 'Champion' },
+            { name: 'Master', value: 'Master' }
+          )
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('backfill-identities')
+      .setDescription('Backfill local Trackmania players with Sprocket identity fields')
+  )
+  .addSubcommand(subcommand =>
+    subcommand
       .setName('cancel-scrim')
       .setDescription('Cancel a queue scrim and return eligible players to the queue')
       .addStringOption(option =>
@@ -131,6 +177,53 @@ export const data = new SlashCommandBuilder()
           .setName('scrim_id')
           .setDescription('The Scrim ID (UUID) to cancel')
           .setRequired(true)
+      )
+  )
+  .addSubcommandGroup(group =>
+    group
+      .setName('roster')
+      .setDescription('Manage Trackmania Sprocket rosters')
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('add')
+          .setDescription('Add or move a player to a roster slot')
+          .addUserOption(option => option.setName('player').setDescription('Player to add').setRequired(true))
+          .addStringOption(option => option.setName('franchise').setDescription('Franchise name/code').setRequired(true))
+          .addStringOption(option => option.setName('slot').setDescription('Roster slot/role').setRequired(true))
+          .addStringOption(option =>
+            option
+              .setName('league')
+              .setDescription('League')
+              .setRequired(true)
+              .addChoices(
+                { name: 'Academy', value: 'Academy' },
+                { name: 'Champion', value: 'Champion' },
+                { name: 'Master', value: 'Master' }
+              )
+          )
+      )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('remove')
+          .setDescription('Remove a player from any Trackmania roster slot')
+          .addUserOption(option => option.setName('player').setDescription('Player to remove').setRequired(true))
+      )
+      .addSubcommand(subcommand =>
+        subcommand
+          .setName('show')
+          .setDescription('Show a franchise roster')
+          .addStringOption(option => option.setName('franchise').setDescription('Franchise name/code').setRequired(true))
+          .addStringOption(option =>
+            option
+              .setName('league')
+              .setDescription('League')
+              .setRequired(true)
+              .addChoices(
+                { name: 'Academy', value: 'Academy' },
+                { name: 'Champion', value: 'Champion' },
+                { name: 'Master', value: 'Master' }
+              )
+          )
       )
   )
   .addSubcommandGroup(group =>
@@ -196,6 +289,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   try {
     switch (subcommandGroup) {
+      case 'roster':
+        await handleRosterCommand(interaction, subcommand);
+        break;
       case 'state':
         await handleStateCommand(interaction, subcommand);
         break;
@@ -221,6 +317,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             break;
           case 'calc-elo':
             await handleCalcElo(interaction);
+            break;
+          case 'audit-match':
+            await handleAuditMatch(interaction);
+            break;
+          case 'elo':
+            await handleElo(interaction);
+            break;
+          case 'backfill-identities':
+            await handleBackfillIdentities(interaction);
             break;
           case 'cancel-scrim':
             await handleCancelScrim(interaction);
@@ -426,6 +531,51 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
+async function handleRosterCommand(
+  interaction: ChatInputCommandInteraction,
+  subcommand: string
+) {
+  await interaction.deferReply({ ephemeral: true });
+
+  switch (subcommand) {
+    case 'add': {
+      const user = interaction.options.getUser('player', true);
+      const franchise = interaction.options.getString('franchise', true);
+      const slot = interaction.options.getString('slot', true);
+      const league = interaction.options.getString('league', true) as League;
+      const row = await rosterService.addPlayer(user.id, franchise, slot, league);
+      await interaction.editReply({
+        content: `Added <@${user.id}> to ${row.franchise_name} ${league} slot ${row.role_name}.`,
+      });
+      return;
+    }
+    case 'remove': {
+      const user = interaction.options.getUser('player', true);
+      const cleared = await rosterService.removePlayer(user.id);
+      await interaction.editReply({ content: `Removed <@${user.id}> from ${cleared} roster slot(s).` });
+      return;
+    }
+    case 'show': {
+      const franchise = interaction.options.getString('franchise', true);
+      const league = interaction.options.getString('league', true) as League;
+      const rows = await rosterService.showFranchise(franchise, league);
+      const embed = new EmbedBuilder()
+        .setColor(0x00aa55)
+        .setTitle(`Roster: ${franchise} - ${league}`)
+        .setDescription(
+          rows.length > 0
+            ? rows.map((row) => `${row.role_name}: ${formatRosterDisplayName(row)} (slot ${row.slot_id})`).join('\n')
+            : 'No roster slots found.'
+        )
+        .setTimestamp();
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+    default:
+      await interaction.editReply({ content: 'Unknown roster subcommand.' });
+  }
+}
+
 async function handleStateCommand(
   interaction: ChatInputCommandInteraction,
   subcommand: string
@@ -578,6 +728,12 @@ async function handleCreateMatch(interaction: ChatInputCommandInteraction) {
   const p3 = interaction.options.getUser('p3', true);
   const p4 = interaction.options.getUser('p4', true);
 
+  const fixtureId = interaction.options.getInteger('fixture_id') ?? undefined;
+  const homeFranchise = interaction.options.getString('home_franchise') ?? undefined;
+  const awayFranchise = interaction.options.getString('away_franchise') ?? undefined;
+  const scheduleGroupId = interaction.options.getInteger('schedule_group_id') ?? undefined;
+  const week = interaction.options.getInteger('week') ?? undefined;
+
   const discordIds = [p1.id, p2.id, p3.id, p4.id];
 
   // Ensure all players are registered
@@ -595,10 +751,16 @@ async function handleCreateMatch(interaction: ChatInputCommandInteraction) {
   }
 
   try {
-    const scrim = await scrimService.createScheduledMatch(league, players);
+    const scrim = await scrimService.createScheduledMatch(league, players, {
+      fixtureId,
+      homeFranchise,
+      awayFranchise,
+      scheduleGroupId,
+      week,
+    });
 
     await interaction.reply({
-      content: `✅ Scheduled Match Created!\nID: \`${scrim.scrim_uid}\`\nLeague: ${league}\nPlayers: ${players.map(p => p.discord_username).join(', ')}`,
+      content: `Scheduled Match Created!\nID: \`${scrim.scrim_uid}\`\nLeague: ${league}\nFixture: ${fixtureId ?? (homeFranchise && awayFranchise ? `${homeFranchise} vs ${awayFranchise}` : 'none')}\nPlayers: ${players.map(p => p.discord_username).join(', ')}`,
       ephemeral: false
     });
   } catch (error) {
@@ -662,6 +824,161 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
       });
     }
   }
+}
+
+async function handleAuditMatch(interaction: ChatInputCommandInteraction) {
+  const scrimUid = interaction.options.getString('scrim_id', true);
+  await interaction.deferReply({ ephemeral: true });
+
+  const report = await matchAuditService.auditByScrimUid(scrimUid);
+  if (!report) {
+    await interaction.editReply({ content: `Scrim \`${scrimUid}\` was not found.` });
+    return;
+  }
+
+  await interaction.editReply({ embeds: [buildAuditEmbed(report)] });
+}
+
+async function handleElo(interaction: ChatInputCommandInteraction) {
+  const user = interaction.options.getUser('player', true);
+  const league = interaction.options.getString('league') as League | null;
+  await interaction.deferReply({ ephemeral: true });
+
+  const player = await playerService.getByDiscordId(user.id);
+  if (!player) {
+    await interaction.editReply({ content: `${user.username} is not registered in the system.` });
+    return;
+  }
+
+  const summary = await eloService.getPlayerEloSummary(player.id, league ?? undefined);
+  const embed = new EmbedBuilder()
+    .setColor(0x3366cc)
+    .setTitle(`Elo: ${player.discord_username}`)
+    .setDescription(`Local player ${player.id} | Sprocket ${player.sprocket_player_id ?? 'n/a'}`);
+
+  embed.addFields({
+    name: 'Current Ratings',
+    value:
+      summary.ratings.length > 0
+        ? summary.ratings
+            .map((rating) => `${rating.league}: ${rating.rating} (${rating.wins}W/${rating.losses}L)`)
+            .join('\n')
+        : 'No current ratings found.',
+    inline: false,
+  });
+
+  embed.addFields({
+    name: 'Recent History',
+    value:
+      summary.history.length > 0
+        ? summary.history
+            .slice(0, 10)
+            .map((row) => `${row.scrim_uid}: ${row.old_rating} → ${row.new_rating} (${row.change_amount >= 0 ? '+' : ''}${row.change_amount})`)
+            .join('\n')
+        : 'No Elo history found.',
+    inline: false,
+  });
+
+  await interaction.editReply({ embeds: [embed.setTimestamp()] });
+}
+
+function buildAuditEmbed(report: MatchAuditReport) {
+  const passFail = (passed: boolean) => (passed ? 'PASS' : 'FAIL');
+  const embed = new EmbedBuilder()
+    .setColor(Object.values(report.checks).every(Boolean) ? 0x00aa55 : 0xff9900)
+    .setTitle(`Match Audit: ${report.scrim.scrim_uid}`)
+    .setDescription(
+      [
+        `Local ID: ${report.scrim.id}`,
+        `Status: ${report.scrim.match_type} / ${report.scrim.status}`,
+        `Sprocket: parent ${report.scrim.sprocket_match_parent_id ?? 'n/a'} | match ${report.scrim.sprocket_match_id ?? 'n/a'}`,
+        `Winner Team: ${report.scrim.winner_team ?? 'n/a'} | Elo Processed: ${report.scrim.elo_processed ? 'yes' : 'no'}`,
+      ].join('\n')
+    );
+
+  embed.addFields({
+    name: 'Checks',
+    value: Object.entries(report.checks)
+      .map(([name, passed]) => `${name}: ${passFail(passed)}`)
+      .join('\n'),
+    inline: false,
+  });
+
+  embed.addFields({
+    name: 'Fixture',
+    value: report.fixture
+      ? [
+          `Fixture: ${report.fixture.fixture_id}`,
+          `Home: ${report.fixture.home_franchise_name ?? report.fixture.home_franchise_id ?? 'n/a'}`,
+          `Away: ${report.fixture.away_franchise_name ?? report.fixture.away_franchise_id ?? 'n/a'}`,
+          `Group: ${report.fixture.schedule_group_name ?? report.fixture.schedule_group_id ?? 'n/a'}`,
+        ].join('\n')
+      : 'No fixture linked.',
+    inline: false,
+  });
+
+  embed.addFields({
+    name: 'Players',
+    value:
+      report.players.length > 0
+        ? report.players
+            .map((player) => `${player.discord_username}: local ${player.local_player_id}, sprocket ${player.sprocket_player_id ?? 'n/a'}, team ${player.team_id ?? 'n/a'}`)
+            .join('\n')
+            .slice(0, 1024)
+        : 'No players found.',
+    inline: false,
+  });
+
+  embed.addFields({
+    name: 'Rows',
+    value: `Stats: ${report.stats.reduce((sum, row) => sum + row.stat_rows, 0)} | Eligibility: ${report.eligibility.length} | Elo history: ${report.elo_history.length}`,
+    inline: false,
+  });
+
+  return embed.setTimestamp();
+}
+
+async function handleBackfillIdentities(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const issues = await identityBackfillService.backfillTrackmaniaPlayerIdentities();
+  const missing = issues.filter((issue) => issue.reason === 'missing_sprocket_profile');
+  const duplicates = issues.filter((issue) => issue.reason === 'duplicate_sprocket_profiles');
+
+  const embed = new EmbedBuilder()
+    .setColor(issues.length === 0 ? 0x00aa55 : 0xff9900)
+    .setTitle('Trackmania Identity Backfill')
+    .setDescription(
+      issues.length === 0
+        ? 'Backfill completed successfully. No missing or duplicate Sprocket profiles were found.'
+        : `Backfill completed with ${issues.length} issue(s). Missing: ${missing.length}. Duplicates: ${duplicates.length}.`
+    )
+    .setTimestamp();
+
+  if (issues.length > 0) {
+    embed.addFields({
+      name: 'Issues',
+      value: issues
+        .slice(0, 10)
+        .map((issue) => {
+          const profileIds = issue.sprocket_player_ids.length > 0 ? issue.sprocket_player_ids.join(', ') : 'none';
+          return `${issue.discord_username} (${issue.discord_id}) local ${issue.local_player_id}: ${issue.reason}; Sprocket profiles: ${profileIds}`;
+        })
+        .join('\n')
+        .slice(0, 1024),
+      inline: false,
+    });
+  }
+
+  await interaction.editReply({ embeds: [embed] });
+}
+
+function formatRosterDisplayName(row: { discord_id: string | null; discord_username?: string | null; player_id: number | null }) {
+  if (!row.player_id) {
+    return 'Empty';
+  }
+
+  return row.discord_username || row.discord_id || `Sprocket player ${row.player_id}`;
 }
 
 async function handleCancelScrim(interaction: ChatInputCommandInteraction) {

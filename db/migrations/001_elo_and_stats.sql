@@ -62,4 +62,19 @@ ALTER TABLE scrims ADD COLUMN IF NOT EXISTS winner_team INTEGER CHECK (winner_te
 ALTER TABLE scrims ADD COLUMN IF NOT EXISTS match_type VARCHAR(20) DEFAULT 'QUEUE' CHECK (match_type IN ('QUEUE', 'SCHEDULED'));
 ALTER TABLE scrims ADD COLUMN IF NOT EXISTS elo_processed BOOLEAN DEFAULT FALSE;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'trackmania_elo_history_player_scrim_key'
+  ) THEN
+    ALTER TABLE elo_history
+      ADD CONSTRAINT trackmania_elo_history_player_scrim_key UNIQUE (player_id, scrim_id);
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_match_player_stats_unique_scrim_map_player
+  ON match_player_stats(scrim_id, COALESCE(map_id, 0), player_id);
+
 CREATE INDEX idx_scrims_elo_processed ON scrims(elo_processed);

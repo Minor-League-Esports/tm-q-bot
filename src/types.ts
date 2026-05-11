@@ -11,6 +11,9 @@ export interface Player {
   discord_id: string;
   discord_username: string;
   league: League;
+  sprocket_player_id?: number | null;
+  member_id?: number | null;
+  platform_account_ids?: string[];
   created_at: Date;
   updated_at: Date;
 }
