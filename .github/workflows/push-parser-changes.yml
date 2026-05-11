@@ -25,6 +25,7 @@ jobs:
       - name: Authenticate clasp
         env:
           CLASPRC_CONTENT: ${{ secrets.GAS_CLASPRC_JSON }}
+          HOME: ${{ github.workspace }}
         run: |
           printf '%s' "$CLASPRC_CONTENT" > ~/.clasprc.json
           chmod 644 ~/.clasprc.json
