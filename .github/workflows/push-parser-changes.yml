@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'parser/**'
+  workflow_trigger:
 
 jobs:
   deploy-parser:

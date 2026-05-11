@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_trigger:
 
 permissions:
   contents: read
