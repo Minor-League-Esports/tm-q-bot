@@ -1,0 +1,37 @@
+name: Deploy Parser (Google Apps Script)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'parser/**'
+
+jobs:
+  deploy-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Create clasp config
+        run: |
+          echo '{"scriptId":"${{ secrets.GAS_SCRIPT_ID }}","rootDir":"parser"}' > parser/.clasp.json
+
+      - name: Authenticate clasp
+        run: |
+          echo '${{ secrets.GAS_CLASPRC_JSON }}' > ~/.clasprc.json
+
+      - name: Push code to Apps Script
+        run: clasp push --force
+        working-directory: parser
+
+      - name: Create new deployment
+        run: clasp deploy --description "Deploy ${{ github.sha }}"
+        working-directory: parser
