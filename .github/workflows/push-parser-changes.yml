@@ -30,7 +30,10 @@ jobs:
           chmod 644 ~/.clasprc.json
 
       - name: Push code to Apps Script
-        run: npx @google/clasp push --force
+        run: |
+          echo $CLASPRC_JSON
+          cat ~/.clasprc.json
+          npx @google/clasp push --force
         working-directory: parser
         env:
           CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
