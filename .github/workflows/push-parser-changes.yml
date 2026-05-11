@@ -32,9 +32,7 @@ jobs:
 
       - name: Push code to Apps Script
         run: |
-          echo $CLASPRC_JSON
-          cat ~/.clasprc.json
-          npx @google/clasp push --force
+          npx @google/clasp push --force --auth ~/.clasprc.json
         working-directory: parser
         env:
           CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
