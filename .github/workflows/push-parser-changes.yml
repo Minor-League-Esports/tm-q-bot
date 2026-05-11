@@ -31,6 +31,8 @@ jobs:
           chmod 644 ~/.clasprc.json
 
       - name: Push code to Apps Script
+        env:
+          HOME: ${{ github.workspace }}
         run: |
           echo $CLASPRC_JSON
           cat ~/.clasprc.json
