@@ -34,7 +34,7 @@ jobs:
           clientSecret: ${{ secrets.CLIENT_SECRET }}
           scriptId: ${{ secrets.SCRIPT_ID }}
           command: 'push'
-          rootDir: 'parser/'
+          rootDir: '${{ github.WORKSPACE }}/parser/'
 
       - name: Push code to Parser sheet/script
         uses: daikikatsuragawa/clasp-action@v1.1.0
