@@ -30,16 +30,27 @@ jobs:
           printf '%s' "$CLASPRC_CONTENT" > ~/.clasprc.json
           chmod 644 ~/.clasprc.json
 
-      - name: Push code to Apps Script
-        run: |
-          npx @google/clasp push --force --auth ~/.clasprc.json
-        working-directory: parser
-        env:
-          CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
-          HOME: ${{ github.workspace }}
+      - name: Push code to Parser sheet/script
+        uses: daikikatsuragawa/clasp-action@v1.1.0
+        with:
+          accessToken: ${{ secrets.ACCESS_TOKEN }}
+          idToken: ${{ secrets.ID_TOKEN }}
+          refreshToken: ${{ secrets.REFRESH_TOKEN }}
+          clientId: ${{ secrets.CLIENT_ID }}
+          clientSecret: ${{ secrets.CLIENT_SECRET }}
+          scriptId: ${{ secrets.SCRIPT_ID }}
+          command: 'push'
+          rootDir: 'parser'
 
-      - name: Create new deployment
-        run: clasp deploy --description "Deploy ${{ github.sha }}"
-        working-directory: parser
-        env:
-          CLASPRC_JSON: ${{ secrets.GAS_CLASPRC_JSON }}
+      - name: Push code to Parser sheet/script
+        uses: daikikatsuragawa/clasp-action@v1.1.0
+        with:
+          accessToken: ${{ secrets.ACCESS_TOKEN }}
+          idToken: ${{ secrets.ID_TOKEN }}
+          refreshToken: ${{ secrets.REFRESH_TOKEN }}
+          clientId: ${{ secrets.CLIENT_ID }}
+          clientSecret: ${{ secrets.CLIENT_SECRET }}
+          scriptId: ${{ secrets.SCRIPT_ID }}
+          command: 'deploy'
+          rootDir: 'parser'
+          description: 'Deploy ${{ github.sha }}'
