@@ -15,6 +15,7 @@ import { identityBackfillService } from '../services/identity-backfill.service.j
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
 import { db, tableName } from '../db/index.js';
+import { parseLinkTmInput, executePlatformLink } from '../services/link-tm.service.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -574,81 +575,22 @@ async function handleLinkTm(interaction: ChatInputCommandInteraction) {
   const discordId = targetUser.id;
 
   try {
-    // 1. Verify user is registered in trackmania.players
-    const playerResult = await db.query<{ id: number; sprocket_player_id: number }(
-      `SELECT id, sprocket_player_id FROM ${tableName('players')} WHERE discord_id = $1`,
-      [discordId]
-    );
+    const result = await parseLinkTmInput(discordId, platform, accountId);
 
-    if (playerResult.rows.length === 0) {
+    if (result.error) {
       await interaction.editReply({
-        content: `❌ ${targetUser.username} is not registered in the Trackmania system.`,
+        content: `❌ ${targetUser.username}: ${result.message}.`,
       });
       return;
     }
 
-    const player = playerResult.rows[0];
+    const linkResult = await executePlatformLink(result.memberId, result.platformId, result.platformCode, accountId);
 
-    // 2. Get the memberId from sprocket.player
-    const sprocketPlayerResult = await db.query<{ memberId: number }(
-      `SELECT "memberId" FROM sprocket.player WHERE id = $1`,
-      [player.sprocket_player_id]
-    );
+    const message = linkResult.isUpdate
+      ? `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`
+      : `✅ Linked ${targetUser.username}'s ${platform} account (\`${accountId}\`).`;
 
-    if (sprocketPlayerResult.rows.length === 0) {
-      await interaction.editReply({
-        content: `❌ Could not find Sprocket player record for ${targetUser.username}.`,
-      });
-      return;
-    }
-
-    const memberId = sprocketPlayerResult.rows[0].memberId;
-
-    // 3. Get the platform ID
-    const platformResult = await db.query<{ id: number }(
-      `SELECT id FROM sprocket.platform WHERE code = $1`,
-      [platform]
-    );
-
-    if (platformResult.rows.length === 0) {
-      await interaction.editReply({
-        content: `❌ Unknown platform: ${platform}.`,
-      });
-      return;
-    }
-
-    const platformId = platformResult.rows[0].id;
-
-    // 4. Check if already linked
-    const existingLink = await db.query(
-      `SELECT id FROM sprocket.member_platform_account 
-       WHERE "memberId" = $1 AND "platformId" = $2`,
-      [memberId, platformId]
-    );
-
-    if (existingLink.rows.length > 0) {
-      // Update existing
-      await db.query(
-        `UPDATE sprocket.member_platform_account 
-         SET "platformAccountId" = $1, "updatedAt" = NOW()
-         WHERE "memberId" = $2 AND "platformId" = $3`,
-        [accountId, memberId, platformId]
-      );
-      await interaction.editReply({
-        content: `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`,
-      });
-    } else {
-      // Insert new
-      await db.query(
-        `INSERT INTO sprocket.member_platform_account ("platformAccountId", "memberId", "platformId", "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, NOW(), NOW())`,
-        [accountId, memberId, platformId]
-      );
-      await interaction.editReply({
-        content: `✅ Linked ${targetUser.username}'s ${platform} account (\`${accountId}\`).`,
-      });
-    }
-
+    await interaction.editReply({ content: message });
     logger.info(`Admin linked ${targetUser.username} (${discordId}) ${platform} account: ${accountId}`);
 
   } catch (error) {
