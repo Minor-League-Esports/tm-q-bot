@@ -14,6 +14,8 @@ import { rosterService } from '../services/roster.service.js';
 import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
+import { db, tableName } from '../db/index.js';
+import { parseLinkTmInput, executePlatformLink } from '../services/link-tm.service.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -91,6 +93,35 @@ export const data = new SlashCommandBuilder()
         option
           .setName('user')
           .setDescription('The user to view dodge history for')
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('link-tm')
+      .setDescription("Link a player's Trackmania account")
+      .addUserOption(option =>
+        option
+          .setName('player')
+          .setDescription('The player to link')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option
+          .setName('platform')
+          .setDescription('Gaming platform')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Steam', value: 'STEAM' },
+            { name: 'Epic', value: 'EPIC' },
+            { name: 'Xbox', value: 'XBOX' },
+            { name: 'PS4/PS5', value: 'PS4' }
+          )
+      )
+      .addStringOption(option =>
+        option
+          .setName('account-id')
+          .setDescription("Player's account ID (from Trackmania settings → Account)")
           .setRequired(true)
       )
   )
@@ -312,6 +343,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           case 'dodges':
             await handleDodges(interaction);
             break;
+          case 'link-tm':
+            await handleLinkTm(interaction);
+            break;
           case 'create-match':
             await handleCreateMatch(interaction);
             break;
@@ -529,6 +563,42 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
   embed.setTimestamp();
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+async function handleLinkTm(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const targetUser = interaction.options.getUser('player', true);
+  const platform = interaction.options.getString('platform', true);
+  const accountId = interaction.options.getString('account-id', true).trim();
+
+  const discordId = targetUser.id;
+
+  try {
+    const result = await parseLinkTmInput(discordId, platform, accountId);
+
+    if (result.error) {
+      await interaction.editReply({
+        content: `❌ ${targetUser.username}: ${result.message}.`,
+      });
+      return;
+    }
+
+    const linkResult = await executePlatformLink(result.memberId, result.platformId, result.platformCode, accountId);
+
+    const message = linkResult.isUpdate
+      ? `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`
+      : `✅ Linked ${targetUser.username}'s ${platform} account (\`${accountId}\`).`;
+
+    await interaction.editReply({ content: message });
+    logger.info(`Admin linked ${targetUser.username} (${discordId}) ${platform} account: ${accountId}`);
+
+  } catch (error) {
+    logger.error('Error in /admin link-tm:', error);
+    await interaction.editReply({
+      content: '❌ An error occurred. Please try again or contact a developer.',
+    });
+  }
 }
 
 async function handleRosterCommand(
