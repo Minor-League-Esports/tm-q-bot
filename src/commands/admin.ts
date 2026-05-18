@@ -14,6 +14,7 @@ import { rosterService } from '../services/roster.service.js';
 import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
+import { db, tableName } from '../db/index.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -91,6 +92,35 @@ export const data = new SlashCommandBuilder()
         option
           .setName('user')
           .setDescription('The user to view dodge history for')
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('link-tm')
+      .setDescription("Link a player's Trackmania account")
+      .addUserOption(option =>
+        option
+          .setName('player')
+          .setDescription('The player to link')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option
+          .setName('platform')
+          .setDescription('Gaming platform')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Steam', value: 'STEAM' },
+            { name: 'Epic', value: 'EPIC' },
+            { name: 'Xbox', value: 'XBOX' },
+            { name: 'PS4/PS5', value: 'PS4' }
+          )
+      )
+      .addStringOption(option =>
+        option
+          .setName('account-id')
+          .setDescription("Player's account ID (from Trackmania settings → Account)")
           .setRequired(true)
       )
   )
@@ -312,6 +342,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           case 'dodges':
             await handleDodges(interaction);
             break;
+          case 'link-tm':
+            await handleLinkTm(interaction);
+            break;
           case 'create-match':
             await handleCreateMatch(interaction);
             break;
@@ -529,6 +562,101 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
   embed.setTimestamp();
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+async function handleLinkTm(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const targetUser = interaction.options.getUser('player', true);
+  const platform = interaction.options.getString('platform', true);
+  const accountId = interaction.options.getString('account-id', true).trim();
+
+  const discordId = targetUser.id;
+
+  try {
+    // 1. Verify user is registered in trackmania.players
+    const playerResult = await db.query<{ id: number; sprocket_player_id: number }(
+      `SELECT id, sprocket_player_id FROM ${tableName('players')} WHERE discord_id = $1`,
+      [discordId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      await interaction.editReply({
+        content: `❌ ${targetUser.username} is not registered in the Trackmania system.`,
+      });
+      return;
+    }
+
+    const player = playerResult.rows[0];
+
+    // 2. Get the memberId from sprocket.player
+    const sprocketPlayerResult = await db.query<{ memberId: number }(
+      `SELECT "memberId" FROM sprocket.player WHERE id = $1`,
+      [player.sprocket_player_id]
+    );
+
+    if (sprocketPlayerResult.rows.length === 0) {
+      await interaction.editReply({
+        content: `❌ Could not find Sprocket player record for ${targetUser.username}.`,
+      });
+      return;
+    }
+
+    const memberId = sprocketPlayerResult.rows[0].memberId;
+
+    // 3. Get the platform ID
+    const platformResult = await db.query<{ id: number }(
+      `SELECT id FROM sprocket.platform WHERE code = $1`,
+      [platform]
+    );
+
+    if (platformResult.rows.length === 0) {
+      await interaction.editReply({
+        content: `❌ Unknown platform: ${platform}.`,
+      });
+      return;
+    }
+
+    const platformId = platformResult.rows[0].id;
+
+    // 4. Check if already linked
+    const existingLink = await db.query(
+      `SELECT id FROM sprocket.member_platform_account 
+       WHERE "memberId" = $1 AND "platformId" = $2`,
+      [memberId, platformId]
+    );
+
+    if (existingLink.rows.length > 0) {
+      // Update existing
+      await db.query(
+        `UPDATE sprocket.member_platform_account 
+         SET "platformAccountId" = $1, "updatedAt" = NOW()
+         WHERE "memberId" = $2 AND "platformId" = $3`,
+        [accountId, memberId, platformId]
+      );
+      await interaction.editReply({
+        content: `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`,
+      });
+    } else {
+      // Insert new
+      await db.query(
+        `INSERT INTO sprocket.member_platform_account ("platformAccountId", "memberId", "platformId", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, NOW(), NOW())`,
+        [accountId, memberId, platformId]
+      );
+      await interaction.editReply({
+        content: `✅ Linked ${targetUser.username}'s ${platform} account (\`${accountId}\`).`,
+      });
+    }
+
+    logger.info(`Admin linked ${targetUser.username} (${discordId}) ${platform} account: ${accountId}`);
+
+  } catch (error) {
+    logger.error('Error in /admin link-tm:', error);
+    await interaction.editReply({
+      content: '❌ An error occurred. Please try again or contact a developer.',
+    });
+  }
 }
 
 async function handleRosterCommand(
