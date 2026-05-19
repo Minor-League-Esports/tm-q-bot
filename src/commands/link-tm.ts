@@ -35,7 +35,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   try {
     const result = await parseLinkTmInput(discordId, platform, accountId);
 
-    if (result.error) {
+    if ('error' in result && result.error) {
       await interaction.reply({
         content: `❌ ${result.message}.\nPlease register on the Sprocket website first, then contact an admin to be added to the bot.`,
         ephemeral: true,
@@ -43,7 +43,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       return;
     }
 
-    const linkResult = await executePlatformLink(result.memberId, result.platformId, result.platformCode, accountId);
+    const success = result as { memberId: number; platformId: number; platformCode: string };
+    const linkResult = await executePlatformLink(success.memberId, success.platformId, success.platformCode, accountId);
 
     const message = linkResult.isUpdate
       ? `✅ Updated your ${platform} account ID to \`${accountId}\`. You can now submit replays!`
