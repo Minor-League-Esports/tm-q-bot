@@ -4,6 +4,7 @@ export interface LinkedPlatformContext {
   memberId: number;
   platformId: number;
   platformCode: string;
+  error?: never;
 }
 
 export interface LinkTmError {
@@ -21,7 +22,7 @@ export type LinkTmResult = LinkedPlatformContext | LinkTmError;
 export async function parseLinkTmInput(
   discordId: string,
   platform: string,
-  accountId: string
+  _accountId: string
 ): Promise<LinkTmResult> {
   // 1. Verify user is registered in trackmania.players
   const playerResult = await db.query<{ id: number; sprocket_player_id: number }>(
@@ -72,7 +73,7 @@ export async function parseLinkTmInput(
 export async function executePlatformLink(
   memberId: number,
   platformId: number,
-  platformCode: string,
+  _platformCode: string,
   accountId: string
 ): Promise<{ isUpdate: boolean }> {
   // Check if already linked

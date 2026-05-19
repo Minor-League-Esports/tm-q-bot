@@ -14,7 +14,6 @@ import { rosterService } from '../services/roster.service.js';
 import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
-import { db, tableName } from '../db/index.js';
 import { parseLinkTmInput, executePlatformLink } from '../services/link-tm.service.js';
 
 export const data = new SlashCommandBuilder()
@@ -577,14 +576,15 @@ async function handleLinkTm(interaction: ChatInputCommandInteraction) {
   try {
     const result = await parseLinkTmInput(discordId, platform, accountId);
 
-    if (result.error) {
+    if ('error' in result && result.error) {
       await interaction.editReply({
         content: `❌ ${targetUser.username}: ${result.message}.`,
       });
       return;
     }
 
-    const linkResult = await executePlatformLink(result.memberId, result.platformId, result.platformCode, accountId);
+    const success = result as { memberId: number; platformId: number; platformCode: string };
+    const linkResult = await executePlatformLink(success.memberId, success.platformId, success.platformCode, accountId);
 
     const message = linkResult.isUpdate
       ? `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`
