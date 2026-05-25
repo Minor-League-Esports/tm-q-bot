@@ -1,4 +1,4 @@
-import { db, tableName } from '../db/index.js';
+import { db } from '../db/index.js';
 
 export interface LinkedPlatformContext {
   memberId: number;
