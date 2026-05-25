@@ -1,7 +1,4 @@
-import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-} from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { parseLinkTmInput, executePlatformLink } from '../services/link-tm.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -10,26 +7,14 @@ export const data = new SlashCommandBuilder()
   .setDescription('Link your Trackmania account to play scrims')
   .addStringOption((option) =>
     option
-      .setName('platform')
-      .setDescription('Your gaming platform')
-      .setRequired(true)
-      .addChoices(
-        { name: 'Steam', value: 'STEAM' },
-        { name: 'Epic', value: 'EPIC' },
-        { name: 'Xbox', value: 'XBOX' },
-        { name: 'PS4/PS5', value: 'PS4' }
-      )
-  )
-  .addStringOption((option) =>
-    option
       .setName('account-id')
       .setDescription('Your account ID (found in Trackmania settings → Account)')
-      .setRequired(true)
+      .setRequired(true),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const discordId = interaction.user.id;
-  const platform = interaction.options.getString('platform')!;
+  const platform = 'STEAM';
   const accountId = interaction.options.getString('account-id')!.trim();
 
   try {
@@ -44,15 +29,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     const success = result as { memberId: number; platformId: number; platformCode: string };
-    const linkResult = await executePlatformLink(success.memberId, success.platformId, success.platformCode, accountId);
+    const linkResult = await executePlatformLink(
+      success.memberId,
+      success.platformId,
+      success.platformCode,
+      accountId,
+    );
 
-    const message = linkResult.isUpdate
+    const message = linkResult.success
       ? `✅ Updated your ${platform} account ID to \`${accountId}\`. You can now submit replays!`
-      : `✅ Linked your ${platform} account (\`${accountId}\`). You can now submit replays!`;
+      : `Account (\`${accountId}\`) is already in our database. Not linked.`;
 
     await interaction.reply({ content: message, ephemeral: true });
     logger.info(`User ${discordId} linked ${platform} account: ${accountId}`);
-
   } catch (error) {
     logger.error('Error in /link-tm command:', error);
     await interaction.reply({

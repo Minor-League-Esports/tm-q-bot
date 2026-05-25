@@ -22,24 +22,15 @@ export type LinkTmResult = LinkedPlatformContext | LinkTmError;
 export async function parseLinkTmInput(
   discordId: string,
   platform: string,
-  _accountId: string
+  _accountId: string,
 ): Promise<LinkTmResult> {
-  // 1. Verify user is registered in trackmania.players
-  const playerResult = await db.query<{ id: number; sprocket_player_id: number }>(
-    `SELECT id, sprocket_player_id FROM ${tableName('players')} WHERE discord_id = $1`,
-    [discordId]
-  );
-
-  if (playerResult.rows.length === 0) {
-    return { error: true, message: 'Not registered in Trackmania system' };
-  }
-
-  const player = playerResult.rows[0];
-
   // 2. Get the memberId from sprocket.player
   const sprocketPlayerResult = await db.query<{ memberId: number }>(
-    `SELECT "memberId" FROM sprocket.player WHERE id = $1`,
-    [player.sprocket_player_id]
+    `select m.id
+     from sprocket.member m
+      inner join sprocket.user_authentication_account uaa on uaa."userId" = m."userId"
+      where uaa."accountId" = $1;`,
+    [discordId],
   );
 
   if (sprocketPlayerResult.rows.length === 0) {
@@ -51,7 +42,7 @@ export async function parseLinkTmInput(
   // 3. Get the platform ID
   const platformResult = await db.query<{ id: number }>(
     `SELECT id FROM sprocket.platform WHERE code = $1`,
-    [platform]
+    [platform],
   );
 
   if (platformResult.rows.length === 0) {
@@ -74,31 +65,25 @@ export async function executePlatformLink(
   memberId: number,
   platformId: number,
   _platformCode: string,
-  accountId: string
-): Promise<{ isUpdate: boolean }> {
+  accountId: string,
+): Promise<{ success: boolean }> {
   // Check if already linked
   const existingLink = await db.query(
     `SELECT id FROM sprocket.member_platform_account 
-     WHERE "memberId" = $1 AND "platformId" = $2`,
-    [memberId, platformId]
+     WHERE "platformAccountId" = $1`,
+    [accountId],
   );
 
   if (existingLink.rows.length > 0) {
-    // Update existing
-    await db.query(
-      `UPDATE sprocket.member_platform_account 
-       SET "platformAccountId" = $1, "updatedAt" = NOW()
-       WHERE "memberId" = $2 AND "platformId" = $3`,
-      [accountId, memberId, platformId]
-    );
-    return { isUpdate: true };
+    // Account already belongs to someone else
+    return { success: false };
   } else {
     // Insert new
     await db.query(
       `INSERT INTO sprocket.member_platform_account ("platformAccountId", "memberId", "platformId", "createdAt", "updatedAt")
        VALUES ($1, $2, $3, NOW(), NOW())`,
-      [accountId, memberId, platformId]
+      [accountId, memberId, platformId],
     );
-    return { isUpdate: false };
+    return { success: true };
   }
 }
