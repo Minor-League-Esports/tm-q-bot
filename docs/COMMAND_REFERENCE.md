@@ -17,6 +17,7 @@ This page is the compact reference for the bot's slash commands, statuses, and o
 | `/queue list` | Show the players currently queued | Displays usernames by league. |
 | `/checkin` | Confirm that you are ready for your scrim | Only works while you are in a scrim waiting for check-in. |
 | `/profile [user]` | Show player profile and stats | Leave `user` empty to view your own profile. |
+| `/link-tm account-id:<id>` | Link your Trackmania account | Requires an existing Sprocket player record for your Discord account. |
 
 ## Admin Commands
 

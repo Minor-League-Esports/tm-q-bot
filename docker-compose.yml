@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   bot:
+    image: tm-scrim-bot:local
     build: .
     container_name: tm-scrim-bot
     restart: unless-stopped
@@ -16,6 +15,16 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  deploy-commands:
+    image: tm-scrim-bot:local
+    build: .
+    profiles:
+      - tools
+    command: ["node", "dist/scripts/deploy-commands.js"]
+    restart: "no"
+    env_file:
+      - .env
 
   db:
     image: postgres:16-alpine

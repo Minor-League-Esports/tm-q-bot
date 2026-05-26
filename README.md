@@ -79,6 +79,7 @@ npm run format
 - `/queue status` - Check queue status
 - `/checkin` - Check in after queue pop (5 minutes)
 - `/profile [user]` - View player profile
+- `/link-tm <account-id>` - Link your Trackmania account for scrims
 
 ### Admin Commands
 
@@ -115,6 +116,27 @@ APPSCRIPT_BASE_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
 - `db/schema.sql` sets up the core tables.
 - `db/migrations/001_elo_and_stats.sql` adds Elo and match-stat tables.
 - `src/scripts/deploy-commands.ts` publishes the slash commands to Discord.
+
+## Docker Deployment
+
+Publishing commands to Discord and running the bot are separate operations. On a server using Compose, build once, deploy the commands from that image, and start the bot from that same image:
+
+```bash
+docker compose build bot
+docker compose run --rm deploy-commands
+docker compose up -d bot db
+```
+
+Run `docker compose run --rm deploy-commands` again whenever slash-command definitions change, including when adding `/link-tm`. Do not deploy commands from a newer checkout while leaving an older bot image running: Discord can display the new command while the container has no handler for it.
+
+For the published image, use one immutable `sha-*` tag for both operations:
+
+```bash
+IMAGE=ghcr.io/minor-league-esports/tm-q-bot:sha-REPLACE_WITH_COMMIT
+docker pull "$IMAGE"
+docker run --rm --env-file .env "$IMAGE" node dist/scripts/deploy-commands.js
+docker run -d --name tm-scrim-bot --env-file .env "$IMAGE"
+```
 
 ## License
 

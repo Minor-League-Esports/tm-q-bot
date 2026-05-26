@@ -61,18 +61,21 @@ After inviting the bot, you MUST deploy the slash commands:
 
 ```bash
 npm run deploy-commands
+# Or when operating the Docker deployment:
+docker compose run --rm deploy-commands
 ```
 
 You should see:
 ```
-[INFO] Successfully deployed 4 commands to guild YOUR_GUILD_ID
+[INFO] Successfully deployed 5 commands to guild YOUR_GUILD_ID
   - /queue
   - /checkin
   - /profile
   - /admin
+  - /link-tm
 ```
 
-**Wait 5-10 minutes** for Discord to sync the commands globally.
+This project deploys guild-scoped commands, so a successful deployment should normally be visible in that server quickly.
 
 ## Step 8: Test Commands
 
@@ -82,13 +85,14 @@ In any channel the bot can see, type `/` and you should see:
 - `/checkin` - Check in for scrims
 - `/profile` - View player profiles
 - `/admin` - Admin commands (requires Manage Server permission)
+- `/link-tm` - Link your Trackmania account
 
 ## Troubleshooting
 
 ### Commands don't appear when I type `/`
 
-1. **Did you deploy commands?** Run `npm run deploy-commands`
-2. **Wait 5-10 minutes** - Discord can take time to sync
+1. **Did you deploy commands?** Run `npm run deploy-commands`, or `docker compose run --rm deploy-commands` for the Docker deployment
+2. **Did the deploy target the right app and guild?** Check `DISCORD_CLIENT_ID` and `DISCORD_GUILD_ID` in the server `.env`
 3. **Check bot permissions** - Ensure "Use Application Commands" is enabled
 4. **Kick and re-invite** the bot with the correct URL
 5. **Check your GUILD_ID** in `.env` matches your server ID
@@ -96,7 +100,7 @@ In any channel the bot can see, type `/` and you should see:
 ### Commands appear but bot doesn't respond
 
 1. **Check bot is online** - Green dot next to bot name
-2. **Check console logs** - Look for errors in `npm run dev` output
+2. **Check console logs** - Confirm the running image logs `/link-tm` among its loaded command handlers
 3. **Check channel permissions** - Bot needs "Send Messages" in the channel
 4. **Try in DM** - Commands should work in DMs if permissions issue
 
