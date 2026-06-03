@@ -39,6 +39,8 @@ export async function parseLinkTmInput(
 
   const memberId = sprocketPlayerResult.rows[0].memberId;
   console.log(`Found member ID ${memberId} for discord ID ${discordId}`);
+  console.log(`Query result row: ${JSON.stringify(sprocketPlayerResult.rows[0])}`);
+  console.log(`Query result: ${JSON.stringify(sprocketPlayerResult)}`);
 
   // 3. Get the platform ID
   const platformResult = await db.query<{ id: number }>(
