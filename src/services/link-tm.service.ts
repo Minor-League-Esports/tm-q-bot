@@ -78,6 +78,7 @@ export async function executePlatformLink(
     // Account already belongs to someone else
     return { success: false };
   } else {
+    console.log(`Linking (${accountId}, ${memberId}, ${platformId})`);
     // Insert new
     await db.query(
       `INSERT INTO sprocket.member_platform_account ("platformAccountId", "memberId", "platformId", "createdAt", "updatedAt")
