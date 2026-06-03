@@ -37,7 +37,7 @@ export async function parseLinkTmInput(
     return { error: true, message: 'Could not find Sprocket player record' };
   }
 
-  const memberId = sprocketPlayerResult.rows[0].memberId;
+  const memberId = sprocketPlayerResult.rows[0].id;
   console.log(`Found member ID ${memberId} for discord ID ${discordId}`);
   console.log(`Query result row: ${JSON.stringify(sprocketPlayerResult.rows[0])}`);
   console.log(`Query result: ${JSON.stringify(sprocketPlayerResult)}`);
