@@ -25,7 +25,7 @@ export async function parseLinkTmInput(
   _accountId: string,
 ): Promise<LinkTmResult> {
   // 2. Get the memberId from sprocket.player
-  const sprocketPlayerResult = await db.query<{ memberId: number }>(
+  const sprocketPlayerResult = await db.query<{ id: number }>(
     `select m.id
      from sprocket.member m
       inner join sprocket.user_authentication_account uaa on uaa."userId" = m."userId"
