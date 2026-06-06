@@ -1,0 +1,40 @@
+{
+  "maps": [
+    {
+      "rounds": [
+        {
+          "players": [
+            { "name": "PlayerOne", "team": 1, "points": 0, "login": null },
+            { "name": "PlayerTwo", "team": 2, "points": 0, "login": null }
+          ],
+          "isOnPodium": false,
+          "roundNumber": 0,
+          "roundWinningTeam": 0
+        },
+        {
+          "players": [
+            { "name": "PlayerOne", "team": 1, "points": 10, "bestTime": 30000, "finished": true },
+            { "name": "PlayerTwo", "team": 2, "points": 8, "bestTime": 32000, "finished": true }
+          ],
+          "isOnPodium": false,
+          "roundNumber": 0,
+          "roundWinningTeam": 1
+        },
+        {
+          "players": [
+            { "name": "PlayerOne", "team": 1, "points": 25, "bestTime": 30000, "login": "test-login-001", "finished": true },
+            { "name": "PlayerTwo", "team": 2, "points": 20, "bestTime": 32000, "login": "test-login-002", "finished": true }
+          ],
+          "isOnPodium": true,
+          "teams": { "1": ["PlayerOne"], "2": ["PlayerTwo"] },
+          "roundNumber": 0,
+          "roundWinningTeam": 0
+        }
+      ],
+      "uid": "test-map-001",
+      "name": "Test Map"
+    }
+  ],
+  "name": "Test Replay",
+  "gameMode": "TM_Rounds_Online"
+}

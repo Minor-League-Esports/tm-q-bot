@@ -563,7 +563,7 @@ function ParseSingleMapData(mapData, createdTs, teamsData) {
 
       if (!driverTotals[name]) {
         driverTotals[name] = {
-          id: p.id ?? null,
+          id: p.login ?? null,
           name: name,
           team: p.team ?? "Unknown",
           points: 0,
@@ -671,6 +671,22 @@ function ParseSingleMapData(mapData, createdTs, teamsData) {
   }
   result.mapWinner = mapWinner;
   result.roundWinsSummary = JSON.stringify(teamWins);
+
+  // --- Fallback: Get player logins from podium round if missing ---
+  const podiumRound = rounds.find(r => r.isOnPodium === true);
+  if (podiumRound && podiumRound.players) {
+    for (const name in driverTotals) {
+      const driver = driverTotals[name];
+      if (!driver.id) {
+        const podiumPlayer = podiumRound.players.find(p => 
+          normalizeName(p.name) === name
+        );
+        if (podiumPlayer && podiumPlayer.login) {
+          driver.id = podiumPlayer.login;
+        }
+      }
+    }
+  }
 
   for (const name in driverTotals) {
     const d = driverTotals[name];
@@ -1167,4 +1183,47 @@ function setTempFormatting() {
     .build();
 
   sheet.setConditionalFormatRules([...newRules, unverifiedRule, verifiedRule]);
+}
+
+//////////////////////
+// Test Function
+//////////////////////
+
+/**
+ * Test replay parsing - run in Apps Script console: testReplayParsing()
+ */
+function testReplayParsing() {
+  const testData = {
+    "maps": [{
+      "rounds": [
+        { "players": [{ "name": "PlayerOne", "team": 1, "login": null }, { "name": "PlayerTwo", "team": 2, "login": null }], "isOnPodium": false, "roundNumber": 0 },
+        { "players": [{ "name": "PlayerOne", "team": 1, "points": 10, "bestTime": 30000, "finished": true }, { "name": "PlayerTwo", "team": 2, "points": 8, "bestTime": 32000, "finished": true }], "isOnPodium": false, "roundNumber": 0, "roundWinningTeam": 1 },
+        { "players": [{ "name": "PlayerOne", "team": 1, "points": 25, "bestTime": 30000, "login": "test-login-001", "finished": true }, { "name": "PlayerTwo", "team": 2, "points": 20, "bestTime": 32000, "login": "test-login-002", "finished": true }], "isOnPodium": true, "teams": { "1": ["PlayerOne"], "2": ["PlayerTwo"] }, "roundNumber": 0 }
+      ],
+      "uid": "test-map-001",
+      "name": "Test Map"
+    }]
+  };
+
+  try {
+    const result = ParseAllReplayMaps(testData);
+    Logger.log("Maps parsed: " + result.length);
+    if (result.length > 0) {
+      const map = result[0];
+      for (const driver of map.driverPlacements) {
+        Logger.log("Driver: " + driver.name + " | Login: " + driver.id);
+      }
+      const missing = map.driverPlacements.filter(d => !d.id);
+      if (missing.length > 0) {
+        Logger.log("ERROR: Missing logins for: " + missing.map(d => d.name).join(", "));
+        return { success: false, error: "Missing player logins" };
+      }
+      Logger.log("SUCCESS: All players have logins!");
+      return { success: true };
+    }
+    return { success: false, error: "No maps parsed" };
+  } catch (e) {
+    Logger.log("TEST FAILED: " + e.message);
+    return { success: false, error: e.message };
+  }
 }
