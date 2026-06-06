@@ -1,0 +1,59 @@
+{
+  "createdTs": 1780446867,
+  "serverLogin": "L0vNcfn4QnCHn_p6Xd5lAQ",
+  "maps": [
+    {
+      "rounds": [
+        {
+          "players": [],
+          "isOnPodium": false,
+          "roundNumber": 0,
+          "roundWinningTeam": 0
+        },
+        {
+          "players": [
+            { "name": "Kunics", "team": 2, "points": 0, "login": null, "id": null },
+            { "name": "AntHill12", "team": 1, "points": 0, "login": null, "id": null }
+          ],
+          "isOnPodium": false,
+          "roundNumber": 0,
+          "roundWinningTeam": 0
+        },
+        {
+          "players": [
+            { "name": "Kunics", "team": 2, "points": 0, "login": null, "id": null, "dnf": true },
+            { "name": "Abrubos", "team": 2, "points": 0, "login": null, "id": null, "dnf": true },
+            { "name": "AntHill12", "team": 1, "points": 0, "login": null, "id": null, "dnf": true },
+            { "name": "Robbalobb", "team": 1, "points": 0, "login": null, "id": null, "dnf": true }
+          ],
+          "isOnPodium": false,
+          "roundNumber": 0,
+          "roundWinningTeam": 0
+        },
+        {
+          "players": [
+            { "name": "AntHill12", "team": 1, "points": 0, "bestTime": 30188, "login": null, "id": null },
+            { "name": "Kunics", "team": 2, "points": 0, "bestTime": 30596, "login": null, "id": null },
+            { "name": "Robbalobb", "team": 1, "points": 0, "bestTime": 30291, "login": null, "id": null },
+            { "name": "Abrubos", "team": 2, "points": 0, "bestTime": 30438, "login": null, "id": null }
+          ],
+          "isOnPodium": true,
+          "teams": {
+            "1": ["AntHill12", "Robbalobb"],
+            "2": ["Kunics", "Abrubos"]
+          },
+          "roundNumber": 0,
+          "roundWinningTeam": 0,
+          "playerPoints": { "Kunics": 10, "AntHill12": 13, "Abrubos": 12, "Robbalobb": 15 },
+          "login": "uTVqXDu-QmyRvEz6Vpi1Ng"
+        }
+      ],
+      "uid": "test-map-001",
+      "name": "Test Map"
+    }
+  ],
+  "logName": "test-replay.json",
+  "serverName": "Test Server",
+  "name": "Test Replay",
+  "gameMode": "TM_Rounds_Online"
+}
