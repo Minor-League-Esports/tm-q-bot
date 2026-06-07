@@ -2,7 +2,7 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
-  EmbedBuilder
+  EmbedBuilder,
 } from 'discord.js';
 import { queueService } from '../services/queue.service.js';
 import { banService } from '../services/ban.service.js';
@@ -14,17 +14,17 @@ import { rosterService } from '../services/roster.service.js';
 import { identityBackfillService } from '../services/identity-backfill.service.js';
 import { logger } from '../utils/logger.js';
 import { League } from '../types.js';
-import { db, tableName } from '../db/index.js';
+import { parseLinkTmInput, executePlatformLink } from '../services/link-tm.service.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
   .setDescription('Admin commands for queue management')
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('queue-reset')
       .setDescription('Reset a league queue')
-      .addStringOption(option =>
+      .addStringOption((option) =>
         option
           .setName('league')
           .setDescription('The league queue to reset')
@@ -33,69 +33,72 @@ export const data = new SlashCommandBuilder()
             { name: 'Academy', value: 'Academy' },
             { name: 'Champion', value: 'Champion' },
             { name: 'Master', value: 'Master' },
-            { name: 'All', value: 'All' }
-          )
-      )
+            { name: 'All', value: 'All' },
+          ),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('ban')
       .setDescription('Manually ban a player from queueing')
-      .addUserOption(option =>
-        option
-          .setName('user')
-          .setDescription('The user to ban')
-          .setRequired(true)
+      .addUserOption((option) =>
+        option.setName('user').setDescription('The user to ban').setRequired(true),
       )
-      .addIntegerOption(option =>
-        option
-          .setName('duration')
-          .setDescription('Ban duration in minutes')
-          .setRequired(true)
-          .setMinValue(1)
-          .setMaxValue(10080) // 1 week max
+      .addIntegerOption(
+        (option) =>
+          option
+            .setName('duration')
+            .setDescription('Ban duration in minutes')
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(10080), // 1 week max
       )
-      .addStringOption(option =>
-        option
-          .setName('reason')
-          .setDescription('Reason for the ban')
-          .setRequired(true)
-      )
+      .addStringOption((option) =>
+        option.setName('reason').setDescription('Reason for the ban').setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('unban')
-      .setDescription('Remove a player\'s queue ban')
-      .addUserOption(option =>
-        option
-          .setName('user')
-          .setDescription('The user to unban')
-          .setRequired(true)
-      )
+      .setDescription("Remove a player's queue ban")
+      .addUserOption((option) =>
+        option.setName('user').setDescription('The user to unban').setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('stats')
       .setDescription('View detailed player statistics')
-      .addUserOption(option =>
-        option
-          .setName('user')
-          .setDescription('The user to view stats for')
-          .setRequired(true)
-      )
+      .addUserOption((option) =>
+        option.setName('user').setDescription('The user to view stats for').setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('dodges')
-      .setDescription('View a player\'s dodge history')
-      .addUserOption(option =>
+      .setDescription("View a player's dodge history")
+      .addUserOption((option) =>
         option
           .setName('user')
           .setDescription('The user to view dodge history for')
-          .setRequired(true)
-      )
+          .setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName('link-tm')
+      .setDescription("Link a player's Trackmania account")
+      .addUserOption((option) =>
+        option.setName('player').setDescription('The player to link').setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('account-id')
+          .setDescription("Player's account ID (from Trackmania settings → Account)")
+          .setRequired(true),
+      ),
+  )
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('link-tm')
       .setDescription("Link a player's Trackmania account")
@@ -128,7 +131,7 @@ export const data = new SlashCommandBuilder()
     subcommand
       .setName('create-match')
       .setDescription('Create a scheduled match')
-      .addStringOption(option =>
+      .addStringOption((option) =>
         option
           .setName('league')
           .setDescription('The league for this match')
@@ -136,52 +139,79 @@ export const data = new SlashCommandBuilder()
           .addChoices(
             { name: 'Academy', value: 'Academy' },
             { name: 'Champion', value: 'Champion' },
-            { name: 'Master', value: 'Master' }
-          )
+            { name: 'Master', value: 'Master' },
+          ),
       )
-      .addUserOption(option => option.setName('p1').setDescription('Home player 1').setRequired(true))
-      .addUserOption(option => option.setName('p2').setDescription('Home player 2').setRequired(true))
-      .addUserOption(option => option.setName('p3').setDescription('Away player 1').setRequired(true))
-      .addUserOption(option => option.setName('p4').setDescription('Away player 2').setRequired(true))
-      .addIntegerOption(option => option.setName('fixture_id').setDescription('Existing Sprocket fixture ID').setRequired(false))
-      .addStringOption(option => option.setName('home_franchise').setDescription('Home franchise name/code for a test fixture').setRequired(false))
-      .addStringOption(option => option.setName('away_franchise').setDescription('Away franchise name/code for a test fixture').setRequired(false))
-      .addIntegerOption(option => option.setName('schedule_group_id').setDescription('Optional Sprocket schedule group ID').setRequired(false))
-      .addIntegerOption(option => option.setName('week').setDescription('Optional week for Trackmania Test schedule group').setRequired(false))
+      .addUserOption((option) =>
+        option.setName('p1').setDescription('Home player 1').setRequired(true),
+      )
+      .addUserOption((option) =>
+        option.setName('p2').setDescription('Home player 2').setRequired(true),
+      )
+      .addUserOption((option) =>
+        option.setName('p3').setDescription('Away player 1').setRequired(true),
+      )
+      .addUserOption((option) =>
+        option.setName('p4').setDescription('Away player 2').setRequired(true),
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName('fixture_id')
+          .setDescription('Existing Sprocket fixture ID')
+          .setRequired(false),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('home_franchise')
+          .setDescription('Home franchise name/code for a test fixture')
+          .setRequired(false),
+      )
+      .addStringOption((option) =>
+        option
+          .setName('away_franchise')
+          .setDescription('Away franchise name/code for a test fixture')
+          .setRequired(false),
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName('schedule_group_id')
+          .setDescription('Optional Sprocket schedule group ID')
+          .setRequired(false),
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName('week')
+          .setDescription('Optional week for Trackmania Test schedule group')
+          .setRequired(false),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('calc-elo')
       .setDescription('Manually trigger Elo calculation for a match')
-      .addStringOption(option =>
+      .addStringOption((option) =>
         option
           .setName('scrim_id')
           .setDescription('The Scrim ID (UUID) to calculate Elo for')
-          .setRequired(true)
-      )
+          .setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('audit-match')
       .setDescription('Audit a Trackmania scrim result and Sprocket linkage')
-      .addStringOption(option =>
-        option
-          .setName('scrim_id')
-          .setDescription('The Scrim ID (UUID) to audit')
-          .setRequired(true)
-      )
+      .addStringOption((option) =>
+        option.setName('scrim_id').setDescription('The Scrim ID (UUID) to audit').setRequired(true),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('elo')
       .setDescription('Inspect current Elo and recent Elo history for a player')
-      .addUserOption(option =>
-        option
-          .setName('player')
-          .setDescription('The player to inspect')
-          .setRequired(true)
+      .addUserOption((option) =>
+        option.setName('player').setDescription('The player to inspect').setRequired(true),
       )
-      .addStringOption(option =>
+      .addStringOption((option) =>
         option
           .setName('league')
           .setDescription('Optional league filter')
@@ -189,38 +219,44 @@ export const data = new SlashCommandBuilder()
           .addChoices(
             { name: 'Academy', value: 'Academy' },
             { name: 'Champion', value: 'Champion' },
-            { name: 'Master', value: 'Master' }
-          )
-      )
+            { name: 'Master', value: 'Master' },
+          ),
+      ),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('backfill-identities')
-      .setDescription('Backfill local Trackmania players with Sprocket identity fields')
+      .setDescription('Backfill local Trackmania players with Sprocket identity fields'),
   )
-  .addSubcommand(subcommand =>
+  .addSubcommand((subcommand) =>
     subcommand
       .setName('cancel-scrim')
       .setDescription('Cancel a queue scrim and return eligible players to the queue')
-      .addStringOption(option =>
+      .addStringOption((option) =>
         option
           .setName('scrim_id')
           .setDescription('The Scrim ID (UUID) to cancel')
-          .setRequired(true)
-      )
+          .setRequired(true),
+      ),
   )
-  .addSubcommandGroup(group =>
+  .addSubcommandGroup((group) =>
     group
       .setName('roster')
       .setDescription('Manage Trackmania Sprocket rosters')
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('add')
           .setDescription('Add or move a player to a roster slot')
-          .addUserOption(option => option.setName('player').setDescription('Player to add').setRequired(true))
-          .addStringOption(option => option.setName('franchise').setDescription('Franchise name/code').setRequired(true))
-          .addStringOption(option => option.setName('slot').setDescription('Roster slot/role').setRequired(true))
-          .addStringOption(option =>
+          .addUserOption((option) =>
+            option.setName('player').setDescription('Player to add').setRequired(true),
+          )
+          .addStringOption((option) =>
+            option.setName('franchise').setDescription('Franchise name/code').setRequired(true),
+          )
+          .addStringOption((option) =>
+            option.setName('slot').setDescription('Roster slot/role').setRequired(true),
+          )
+          .addStringOption((option) =>
             option
               .setName('league')
               .setDescription('League')
@@ -228,22 +264,26 @@ export const data = new SlashCommandBuilder()
               .addChoices(
                 { name: 'Academy', value: 'Academy' },
                 { name: 'Champion', value: 'Champion' },
-                { name: 'Master', value: 'Master' }
-              )
-          )
+                { name: 'Master', value: 'Master' },
+              ),
+          ),
       )
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('remove')
           .setDescription('Remove a player from any Trackmania roster slot')
-          .addUserOption(option => option.setName('player').setDescription('Player to remove').setRequired(true))
+          .addUserOption((option) =>
+            option.setName('player').setDescription('Player to remove').setRequired(true),
+          ),
       )
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('show')
           .setDescription('Show a franchise roster')
-          .addStringOption(option => option.setName('franchise').setDescription('Franchise name/code').setRequired(true))
-          .addStringOption(option =>
+          .addStringOption((option) =>
+            option.setName('franchise').setDescription('Franchise name/code').setRequired(true),
+          )
+          .addStringOption((option) =>
             option
               .setName('league')
               .setDescription('League')
@@ -251,20 +291,20 @@ export const data = new SlashCommandBuilder()
               .addChoices(
                 { name: 'Academy', value: 'Academy' },
                 { name: 'Champion', value: 'Champion' },
-                { name: 'Master', value: 'Master' }
-              )
-          )
-      )
+                { name: 'Master', value: 'Master' },
+              ),
+          ),
+      ),
   )
-  .addSubcommandGroup(group =>
+  .addSubcommandGroup((group) =>
     group
       .setName('state')
       .setDescription('Inspect current scrim state')
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('summary')
           .setDescription('Show live and scheduled scrims at a glance')
-          .addStringOption(option =>
+          .addStringOption((option) =>
             option
               .setName('league')
               .setDescription('Limit results to a league')
@@ -273,15 +313,15 @@ export const data = new SlashCommandBuilder()
                 { name: 'All', value: 'All' },
                 { name: 'Academy', value: 'Academy' },
                 { name: 'Champion', value: 'Champion' },
-                { name: 'Master', value: 'Master' }
-              )
-          )
+                { name: 'Master', value: 'Master' },
+              ),
+          ),
       )
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('live')
           .setDescription('Show checking-in and active queue scrims')
-          .addStringOption(option =>
+          .addStringOption((option) =>
             option
               .setName('league')
               .setDescription('Limit results to a league')
@@ -290,15 +330,15 @@ export const data = new SlashCommandBuilder()
                 { name: 'All', value: 'All' },
                 { name: 'Academy', value: 'Academy' },
                 { name: 'Champion', value: 'Champion' },
-                { name: 'Master', value: 'Master' }
-              )
-          )
+                { name: 'Master', value: 'Master' },
+              ),
+          ),
       )
-      .addSubcommand(subcommand =>
+      .addSubcommand((subcommand) =>
         subcommand
           .setName('scheduled')
           .setDescription('Show scheduled matches')
-          .addStringOption(option =>
+          .addStringOption((option) =>
             option
               .setName('league')
               .setDescription('Limit results to a league')
@@ -307,10 +347,10 @@ export const data = new SlashCommandBuilder()
                 { name: 'All', value: 'All' },
                 { name: 'Academy', value: 'Academy' },
                 { name: 'Champion', value: 'Champion' },
-                { name: 'Master', value: 'Master' }
-              )
-          )
-      )
+                { name: 'Master', value: 'Master' },
+              ),
+          ),
+      ),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -409,7 +449,7 @@ async function handleQueueReset(interaction: ChatInputCommandInteraction) {
   logger.info('Admin queue reset', {
     adminId: interaction.user.id,
     league,
-    removedCount: count
+    removedCount: count,
   });
 }
 
@@ -439,7 +479,7 @@ async function handleBan(interaction: ChatInputCommandInteraction) {
     adminId: interaction.user.id,
     targetId: user.id,
     durationMinutes,
-    reason
+    reason,
   });
 }
 
@@ -464,7 +504,7 @@ async function handleUnban(interaction: ChatInputCommandInteraction) {
 
   logger.info('Admin unban', {
     adminId: interaction.user.id,
-    targetId: user.id
+    targetId: user.id,
   });
 }
 
@@ -485,7 +525,7 @@ async function handleStats(interaction: ChatInputCommandInteraction) {
   const banHistory = await banService.getPlayerBanHistory(player.id, 10);
 
   const embed = new EmbedBuilder()
-    .setColor(0x0099FF)
+    .setColor(0x0099ff)
     .setTitle(`Admin Stats: ${user.username}`)
     .addFields(
       { name: 'Player ID', value: player.id.toString(), inline: true },
@@ -493,13 +533,13 @@ async function handleStats(interaction: ChatInputCommandInteraction) {
       { name: 'League', value: player.league, inline: true },
       { name: 'Currently Banned', value: isBanned ? 'Yes' : 'No', inline: true },
       { name: 'Recent Dodges (24h)', value: recentDodges.toString(), inline: true },
-      { name: 'Total Bans', value: banHistory.length.toString(), inline: true }
+      { name: 'Total Bans', value: banHistory.length.toString(), inline: true },
     );
 
   if (banHistory.length > 0) {
     const banList = banHistory
       .slice(0, 5)
-      .map(ban => {
+      .map((ban) => {
         const date = new Date(ban.ban_start).toLocaleDateString();
         const type = ban.is_manual ? '👤 Manual' : '🚫 Auto';
         return `${type} - ${date} - ${ban.reason}`;
@@ -509,7 +549,7 @@ async function handleStats(interaction: ChatInputCommandInteraction) {
     embed.addFields({
       name: 'Recent Bans',
       value: banList,
-      inline: false
+      inline: false,
     });
   }
 
@@ -531,10 +571,10 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
   }
 
   const banHistory = await banService.getPlayerBanHistory(player.id, 20);
-  const dodges = banHistory.filter(ban => !ban.is_manual);
+  const dodges = banHistory.filter((ban) => !ban.is_manual);
 
   const embed = new EmbedBuilder()
-    .setColor(0xFF9900)
+    .setColor(0xff9900)
     .setTitle(`Dodge History: ${user.username}`)
     .setDescription(`Total dodges: ${dodges.length}`);
 
@@ -544,7 +584,7 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
       .map((dodge, i) => {
         const date = new Date(dodge.ban_start).toLocaleString();
         const duration = Math.round(
-          (new Date(dodge.ban_end).getTime() - new Date(dodge.ban_start).getTime()) / 60000
+          (new Date(dodge.ban_end).getTime() - new Date(dodge.ban_start).getTime()) / 60000,
         );
         return `${i + 1}. ${date} - ${duration}min ban - ${dodge.reason}`;
       })
@@ -553,7 +593,7 @@ async function handleDodges(interaction: ChatInputCommandInteraction) {
     embed.addFields({
       name: 'Recent Dodges',
       value: dodgeList,
-      inline: false
+      inline: false,
     });
   } else {
     embed.setDescription('No dodge history found.');
@@ -574,83 +614,31 @@ async function handleLinkTm(interaction: ChatInputCommandInteraction) {
   const discordId = targetUser.id;
 
   try {
-    // 1. Verify user is registered in trackmania.players
-    const playerResult = await db.query<{ id: number; sprocket_player_id: number }(
-      `SELECT id, sprocket_player_id FROM ${tableName('players')} WHERE discord_id = $1`,
-      [discordId]
-    );
+    const result = await parseLinkTmInput(discordId, platform, accountId);
 
-    if (playerResult.rows.length === 0) {
+    if ('error' in result && result.error) {
       await interaction.editReply({
-        content: `❌ ${targetUser.username} is not registered in the Trackmania system.`,
+        content: `❌ ${targetUser.username}: ${result.message}.`,
       });
       return;
     }
 
-    const player = playerResult.rows[0];
-
-    // 2. Get the memberId from sprocket.player
-    const sprocketPlayerResult = await db.query<{ memberId: number }(
-      `SELECT "memberId" FROM sprocket.player WHERE id = $1`,
-      [player.sprocket_player_id]
+    const success = result as { memberId: number; platformId: number; platformCode: string };
+    const linkResult = await executePlatformLink(
+      success.memberId,
+      success.platformId,
+      success.platformCode,
+      accountId,
     );
 
-    if (sprocketPlayerResult.rows.length === 0) {
-      await interaction.editReply({
-        content: `❌ Could not find Sprocket player record for ${targetUser.username}.`,
-      });
-      return;
-    }
+    const message = linkResult.success
+      ? `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`
+      : `${platform} account (\`${accountId}\`) already exists in the database. Not linked to ${targetUser.username}.`;
 
-    const memberId = sprocketPlayerResult.rows[0].memberId;
-
-    // 3. Get the platform ID
-    const platformResult = await db.query<{ id: number }(
-      `SELECT id FROM sprocket.platform WHERE code = $1`,
-      [platform]
+    await interaction.editReply({ content: message });
+    logger.info(
+      `Admin linked ${targetUser.username} (${discordId}) ${platform} account: ${accountId}`,
     );
-
-    if (platformResult.rows.length === 0) {
-      await interaction.editReply({
-        content: `❌ Unknown platform: ${platform}.`,
-      });
-      return;
-    }
-
-    const platformId = platformResult.rows[0].id;
-
-    // 4. Check if already linked
-    const existingLink = await db.query(
-      `SELECT id FROM sprocket.member_platform_account 
-       WHERE "memberId" = $1 AND "platformId" = $2`,
-      [memberId, platformId]
-    );
-
-    if (existingLink.rows.length > 0) {
-      // Update existing
-      await db.query(
-        `UPDATE sprocket.member_platform_account 
-         SET "platformAccountId" = $1, "updatedAt" = NOW()
-         WHERE "memberId" = $2 AND "platformId" = $3`,
-        [accountId, memberId, platformId]
-      );
-      await interaction.editReply({
-        content: `✅ Updated ${targetUser.username}'s ${platform} account to \`${accountId}\`.`,
-      });
-    } else {
-      // Insert new
-      await db.query(
-        `INSERT INTO sprocket.member_platform_account ("platformAccountId", "memberId", "platformId", "createdAt", "updatedAt")
-         VALUES ($1, $2, $3, NOW(), NOW())`,
-        [accountId, memberId, platformId]
-      );
-      await interaction.editReply({
-        content: `✅ Linked ${targetUser.username}'s ${platform} account (\`${accountId}\`).`,
-      });
-    }
-
-    logger.info(`Admin linked ${targetUser.username} (${discordId}) ${platform} account: ${accountId}`);
-
   } catch (error) {
     logger.error('Error in /admin link-tm:', error);
     await interaction.editReply({
@@ -659,10 +647,7 @@ async function handleLinkTm(interaction: ChatInputCommandInteraction) {
   }
 }
 
-async function handleRosterCommand(
-  interaction: ChatInputCommandInteraction,
-  subcommand: string
-) {
+async function handleRosterCommand(interaction: ChatInputCommandInteraction, subcommand: string) {
   await interaction.deferReply({ ephemeral: true });
 
   switch (subcommand) {
@@ -680,7 +665,9 @@ async function handleRosterCommand(
     case 'remove': {
       const user = interaction.options.getUser('player', true);
       const cleared = await rosterService.removePlayer(user.id);
-      await interaction.editReply({ content: `Removed <@${user.id}> from ${cleared} roster slot(s).` });
+      await interaction.editReply({
+        content: `Removed <@${user.id}> from ${cleared} roster slot(s).`,
+      });
       return;
     }
     case 'show': {
@@ -692,8 +679,13 @@ async function handleRosterCommand(
         .setTitle(`Roster: ${franchise} - ${league}`)
         .setDescription(
           rows.length > 0
-            ? rows.map((row) => `${row.role_name}: ${formatRosterDisplayName(row)} (slot ${row.slot_id})`).join('\n')
-            : 'No roster slots found.'
+            ? rows
+                .map(
+                  (row) =>
+                    `${row.role_name}: ${formatRosterDisplayName(row)} (slot ${row.slot_id})`,
+                )
+                .join('\n')
+            : 'No roster slots found.',
         )
         .setTimestamp();
       await interaction.editReply({ embeds: [embed] });
@@ -704,10 +696,7 @@ async function handleRosterCommand(
   }
 }
 
-async function handleStateCommand(
-  interaction: ChatInputCommandInteraction,
-  subcommand: string
-) {
+async function handleStateCommand(interaction: ChatInputCommandInteraction, subcommand: string) {
   const leagueOption = interaction.options.getString('league') as League | 'All' | null;
   const league = leagueOption && leagueOption !== 'All' ? (leagueOption as League) : undefined;
 
@@ -727,7 +716,7 @@ async function handleStateCommand(
         'Live Scrims',
         leagueOption ?? 'All',
         liveScrims,
-        'No live scrims are currently checking in or active.'
+        'No live scrims are currently checking in or active.',
       );
       await interaction.editReply({ embeds: [embed] });
       return;
@@ -738,7 +727,7 @@ async function handleStateCommand(
         'Scheduled Matches',
         leagueOption ?? 'All',
         scheduledMatches,
-        'No scheduled matches are currently queued.'
+        'No scheduled matches are currently queued.',
       );
       await interaction.editReply({ embeds: [embed] });
       return;
@@ -753,14 +742,12 @@ async function handleStateCommand(
 function buildStateSummaryEmbed(
   league: League | 'All',
   liveScrims: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>,
-  scheduledMatches: Awaited<ReturnType<typeof scrimService.getScheduledAdminMatches>>
+  scheduledMatches: Awaited<ReturnType<typeof scrimService.getScheduledAdminMatches>>,
 ) {
   const embed = new EmbedBuilder()
     .setColor(0x0099ff)
     .setTitle(`Admin State Summary${league === 'All' ? '' : ` - ${league}`}`)
-    .setDescription(
-      `Live: ${liveScrims.length} | Scheduled: ${scheduledMatches.length}`
-    );
+    .setDescription(`Live: ${liveScrims.length} | Scheduled: ${scheduledMatches.length}`);
 
   embed.addFields(
     {
@@ -775,7 +762,7 @@ function buildStateSummaryEmbed(
           ? scheduledMatches.map(formatAdminScrimLine).join('\n\n')
           : 'None',
       inline: false,
-    }
+    },
   );
 
   return embed.setTimestamp();
@@ -785,7 +772,7 @@ function buildStateDetailEmbed(
   title: string,
   league: League | 'All',
   details: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>,
-  emptyMessage: string
+  emptyMessage: string,
 ) {
   const embed = new EmbedBuilder()
     .setColor(0x00aa55)
@@ -805,7 +792,9 @@ function buildStateDetailEmbed(
   return embed.setTimestamp();
 }
 
-function formatAdminScrimLine(detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number]) {
+function formatAdminScrimLine(
+  detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number],
+) {
   const statusLine = `${detail.scrim.match_type} / ${detail.scrim.status}`;
   const playerNames = detail.players.map((player) => player.discord_username).join(', ');
   const mapNames = detail.maps.length > 0 ? detail.maps.map((map) => map.name).join(', ') : 'None';
@@ -824,7 +813,9 @@ function formatAdminScrimLine(detail: Awaited<ReturnType<typeof scrimService.get
   ].join('\n');
 }
 
-function formatAdminScrimDetail(detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number]) {
+function formatAdminScrimDetail(
+  detail: Awaited<ReturnType<typeof scrimService.getLiveAdminScrims>>[number],
+) {
   const checkedIn = `${detail.checkedInCount}/${detail.players.length} checked in`;
   const checkInDeadline =
     detail.scrim.checkin_deadline && detail.scrim.status === 'checking_in'
@@ -871,7 +862,7 @@ async function handleCreateMatch(interaction: ChatInputCommandInteraction) {
     if (!player) {
       await interaction.reply({
         content: `❌ User <@${discordId}> is not registered in the system.`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -888,14 +879,14 @@ async function handleCreateMatch(interaction: ChatInputCommandInteraction) {
     });
 
     await interaction.reply({
-      content: `Scheduled Match Created!\nID: \`${scrim.scrim_uid}\`\nLeague: ${league}\nFixture: ${fixtureId ?? (homeFranchise && awayFranchise ? `${homeFranchise} vs ${awayFranchise}` : 'none')}\nPlayers: ${players.map(p => p.discord_username).join(', ')}`,
-      ephemeral: false
+      content: `Scheduled Match Created!\nID: \`${scrim.scrim_uid}\`\nLeague: ${league}\nFixture: ${fixtureId ?? (homeFranchise && awayFranchise ? `${homeFranchise} vs ${awayFranchise}` : 'none')}\nPlayers: ${players.map((p) => p.discord_username).join(', ')}`,
+      ephemeral: false,
     });
   } catch (error) {
     logger.error('Error creating scheduled match:', error);
     await interaction.reply({
       content: '❌ Failed to create scheduled match.',
-      ephemeral: true
+      ephemeral: true,
     });
   }
 }
@@ -910,7 +901,7 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
     if (!scrim) {
       await interaction.reply({
         content: `❌ Scrim with ID \`${scrimUid}\` not found.`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -918,7 +909,7 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
     if (scrim.status !== 'completed') {
       await interaction.reply({
         content: `❌ Scrim \`${scrimUid}\` is not marked as completed yet.`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -926,7 +917,7 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
     if (scrim.elo_processed) {
       await interaction.reply({
         content: `⚠️ Elo for scrim \`${scrimUid}\` has already been processed.`,
-        ephemeral: true
+        ephemeral: true,
       });
       return;
     }
@@ -936,19 +927,18 @@ async function handleCalcElo(interaction: ChatInputCommandInteraction) {
     await eloService.processMatch(scrim.id);
 
     await interaction.editReply({
-      content: `✅ Elo calculation completed for scrim \`${scrimUid}\`.`
+      content: `✅ Elo calculation completed for scrim \`${scrimUid}\`.`,
     });
-
   } catch (error) {
     logger.error('Error calculating Elo:', error);
     if (interaction.deferred) {
       await interaction.editReply({
-        content: '❌ An error occurred while calculating Elo.'
+        content: '❌ An error occurred while calculating Elo.',
       });
     } else {
       await interaction.reply({
         content: '❌ An error occurred while calculating Elo.',
-        ephemeral: true
+        ephemeral: true,
       });
     }
   }
@@ -989,7 +979,9 @@ async function handleElo(interaction: ChatInputCommandInteraction) {
     value:
       summary.ratings.length > 0
         ? summary.ratings
-            .map((rating) => `${rating.league}: ${rating.rating} (${rating.wins}W/${rating.losses}L)`)
+            .map(
+              (rating) => `${rating.league}: ${rating.rating} (${rating.wins}W/${rating.losses}L)`,
+            )
             .join('\n')
         : 'No current ratings found.',
     inline: false,
@@ -1001,7 +993,10 @@ async function handleElo(interaction: ChatInputCommandInteraction) {
       summary.history.length > 0
         ? summary.history
             .slice(0, 10)
-            .map((row) => `${row.scrim_uid}: ${row.old_rating} → ${row.new_rating} (${row.change_amount >= 0 ? '+' : ''}${row.change_amount})`)
+            .map(
+              (row) =>
+                `${row.scrim_uid}: ${row.old_rating} → ${row.new_rating} (${row.change_amount >= 0 ? '+' : ''}${row.change_amount})`,
+            )
             .join('\n')
         : 'No Elo history found.',
     inline: false,
@@ -1021,7 +1016,7 @@ function buildAuditEmbed(report: MatchAuditReport) {
         `Status: ${report.scrim.match_type} / ${report.scrim.status}`,
         `Sprocket: parent ${report.scrim.sprocket_match_parent_id ?? 'n/a'} | match ${report.scrim.sprocket_match_id ?? 'n/a'}`,
         `Winner Team: ${report.scrim.winner_team ?? 'n/a'} | Elo Processed: ${report.scrim.elo_processed ? 'yes' : 'no'}`,
-      ].join('\n')
+      ].join('\n'),
     );
 
   embed.addFields({
@@ -1050,7 +1045,10 @@ function buildAuditEmbed(report: MatchAuditReport) {
     value:
       report.players.length > 0
         ? report.players
-            .map((player) => `${player.discord_username}: local ${player.local_player_id}, sprocket ${player.sprocket_player_id ?? 'n/a'}, team ${player.team_id ?? 'n/a'}`)
+            .map(
+              (player) =>
+                `${player.discord_username}: local ${player.local_player_id}, sprocket ${player.sprocket_player_id ?? 'n/a'}, team ${player.team_id ?? 'n/a'}`,
+            )
             .join('\n')
             .slice(0, 1024)
         : 'No players found.',
@@ -1079,7 +1077,7 @@ async function handleBackfillIdentities(interaction: ChatInputCommandInteraction
     .setDescription(
       issues.length === 0
         ? 'Backfill completed successfully. No missing or duplicate Sprocket profiles were found.'
-        : `Backfill completed with ${issues.length} issue(s). Missing: ${missing.length}. Duplicates: ${duplicates.length}.`
+        : `Backfill completed with ${issues.length} issue(s). Missing: ${missing.length}. Duplicates: ${duplicates.length}.`,
     )
     .setTimestamp();
 
@@ -1089,7 +1087,8 @@ async function handleBackfillIdentities(interaction: ChatInputCommandInteraction
       value: issues
         .slice(0, 10)
         .map((issue) => {
-          const profileIds = issue.sprocket_player_ids.length > 0 ? issue.sprocket_player_ids.join(', ') : 'none';
+          const profileIds =
+            issue.sprocket_player_ids.length > 0 ? issue.sprocket_player_ids.join(', ') : 'none';
           return `${issue.discord_username} (${issue.discord_id}) local ${issue.local_player_id}: ${issue.reason}; Sprocket profiles: ${profileIds}`;
         })
         .join('\n')
@@ -1101,7 +1100,11 @@ async function handleBackfillIdentities(interaction: ChatInputCommandInteraction
   await interaction.editReply({ embeds: [embed] });
 }
 
-function formatRosterDisplayName(row: { discord_id: string | null; discord_username?: string | null; player_id: number | null }) {
+function formatRosterDisplayName(row: {
+  discord_id: string | null;
+  discord_username?: string | null;
+  player_id: number | null;
+}) {
   if (!row.player_id) {
     return 'Empty';
   }

@@ -17,7 +17,9 @@ async function deployCommands() {
     const rest = new REST().setToken(config.discord.token);
 
     // Deploy commands
-    logger.info('Deploying commands to Discord...');
+    logger.info(
+      `Deploying commands to Discord application ${config.discord.clientId} in guild ${config.discord.guildId}...`,
+    );
 
     const data = await rest.put(
       Routes.applicationGuildCommands(config.discord.clientId, config.discord.guildId),

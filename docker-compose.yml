@@ -1,14 +1,11 @@
-version: '3.8'
-
 services:
   bot:
+    image: tm-scrim-bot:local
     build: .
     container_name: tm-scrim-bot
     restart: unless-stopped
     env_file:
-      - .env
-    depends_on:
-      - db
+      - .tm-env
     networks:
       - tm-scrim-network
     logging:
@@ -17,31 +14,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  db:
-    image: postgres:16-alpine
-    container_name: tm-scrim-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: tmscrim
-      POSTGRES_USER: tmscrim
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
-    ports:
-      - "5433:5432"
-    networks:
-      - tm-scrim-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tmscrim"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  deploy-commands:
+    image: tm-scrim-bot:local
+    build: .
+    profiles:
+      - tools
+    command: ["node", "dist/scripts/deploy-commands.js"]
+    restart: "no"
+    env_file:
+      - .tm-env
 
 networks:
   tm-scrim-network:
     driver: bridge
 
-volumes:
-  postgres-data:

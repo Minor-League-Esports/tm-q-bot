@@ -78,12 +78,13 @@ npm install
 npm run deploy-commands
 ```
 
-Discord will receive four command groups:
+Discord will receive five commands or command groups:
 
 - `/queue`
 - `/checkin`
 - `/profile`
 - `/admin`
+- `/link-tm`
 
 ## 6. Start The Bot
 
@@ -92,6 +93,18 @@ npm run dev
 ```
 
 You should see the bot log in, connect to the database, and start the queue event handlers.
+
+### Running On A Server With Docker
+
+Slash-command deployment is a one-shot action, not part of starting the bot container. Use the same built image for the deployment action and the running bot:
+
+```bash
+docker compose build bot
+docker compose run --rm deploy-commands
+docker compose up -d bot db
+```
+
+After changing slash commands, rebuild the image and run `deploy-commands` again before replacing the running bot container. This ensures a registered command such as `/link-tm` also exists in the runtime handlers.
 
 ## 7. First Smoke Test
 
