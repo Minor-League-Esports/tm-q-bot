@@ -330,6 +330,35 @@ function getStyles() {
 const TEMP_LOSER_PLACEHOLDER = "TEMP_LOSER_NAME_FOR_CALC";
 
 /**
+ * Write a log entry to the Logs sheet
+ * @param {string} methodName - The name of the method logging
+ * @param {string} stage - The processing stage
+ * @param {string|Object} message - The log message or data to log
+ */
+function writeLog(methodName, stage, message) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = ss.getSheetByName("Logs");
+    if (!logSheet) {
+      logSheet = ss.insertSheet("Logs");
+      // Add header row
+      logSheet.appendRow(["Timestamp", "Method", "Stage", "Message", "Details"]);
+      logSheet.getRange(1, 1, 1, 5).setFontWeight("bold");
+      logSheet.setColumnWidths(1, 5, 200);
+      logSheet.setColumnWidth(5, 400);
+    }
+    
+    const timestamp = new Date();
+    const details = typeof message === "object" ? JSON.stringify(message) : String(message);
+    const shortMessage = typeof message === "string" ? message : (message.message || message.error || "See Details");
+    
+    logSheet.appendRow([timestamp, methodName, stage, shortMessage, details]);
+  } catch (e) {
+    Logger.log("Log write failed: " + e.message);
+  }
+}
+
+/**
  * Calculates total map points for each team from the parsed driver data.
  * @param {Array<Object>} driverPlacements - Array of driver objects from the parsed JSON.
  * @returns {Array<{teamName: string, totalPoints: number}>} Sorted by points descending. (teamName is "1" or "2")
@@ -501,6 +530,7 @@ function normalizeName(name) {
  * @returns {Object} The parsed map result.
  */
 function ParseSingleMapData(mapData, createdTs, teamsData) {
+  writeLog("ParseSingleMapData", "START", { mapName: mapData.name, mapUid: mapData.uid, roundCount: (mapData.rounds || []).length });
   const result = {
     mapName: mapData.name || "Unknown",
     mapId: mapData.uid || mapData.id || "Unknown",
@@ -703,6 +733,13 @@ function ParseSingleMapData(mapData, createdTs, teamsData) {
 
   result.driverPlacements.sort((a, b) => b.points - a.points);
 
+  writeLog("ParseSingleMapData", "DONE", { 
+    mapName: result.mapName, 
+    driverCount: result.driverPlacements.length, 
+    roundCount: result.roundCount,
+    mapWinner: result.mapWinner 
+  });
+  
   return result;
 }
 
@@ -712,6 +749,7 @@ function ParseSingleMapData(mapData, createdTs, teamsData) {
  * @returns {Array<Object>} An array of parsed map results.
  */
 function ParseAllReplayMaps(data) {
+  writeLog("ParseAllReplayMaps", "START", { hasMaps: !!data.maps, hasMap: !!data.map, hasRounds: !!data.rounds });
   let mapsToProcess = [];
   if (Array.isArray(data.maps)) {
     mapsToProcess = data.maps;
@@ -736,6 +774,7 @@ function ParseAllReplayMaps(data) {
     // Only process maps that contain actual player data
     if (currentHasPlayerData) {
       try {
+        writeLog("ParseAllReplayMaps", "PARSE_MAP", { mapName: currentMap.name, mapUid: currentMap.uid });
         const parsedMap = ParseSingleMapData(
           currentMap,
           data.createdTs,
@@ -751,10 +790,12 @@ function ParseAllReplayMaps(data) {
           mapWinnerPoints: mapScores[0].totalPoints,
           mapLoserPoints: mapScores[1].totalPoints,
         });
+        writeLog("ParseAllReplayMaps", "MAP_PARSED", { mapName: currentMap.name, driverCount: parsedMap.driverPlacements.length });
       } catch (e) {
         Logger.log(
           "Error parsing map: " + currentMap.name + ". Error: " + e.message
         );
+        writeLog("ParseAllReplayMaps", "MAP_ERROR", { mapName: currentMap.name, error: e.message });
       }
     }
   }
@@ -765,6 +806,7 @@ function ParseAllReplayMaps(data) {
     );
   }
 
+  writeLog("ParseAllReplayMaps", "DONE", { totalMapsParsed: allParsedMaps.length });
   return allParsedMaps;
 }
 
@@ -801,13 +843,16 @@ function getReplayByScrimUid(scrimUid) {
 // Process Replay Upload
 //////////////////////
 function processReplay(data, submittedBy, matchType, scrimUid) {
+  writeLog("processReplay", "START", { submittedBy: submittedBy, matchType: matchType, scrimUid: scrimUid });
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tempSheet = ss.getSheetByName("Temp Submissions");
   if (!tempSheet) throw new Error("Missing 'Temp Submissions' sheet.");
 
   try {
     // *** NEW: Parse ALL maps instead of just the "best" one ***
+    writeLog("processReplay", "PARSE_ALL_MAPS", "Starting to parse replay data");
     const allParsedMaps = ParseAllReplayMaps(data);
+    writeLog("processReplay", "PARSE_ALL_MAPS_DONE", { mapCount: allParsedMaps.length });
 
     // For logging to the spreadsheet, we will choose the map with the most rounds,
     // as the sheet structure is designed for single-map submissions.
@@ -868,6 +913,7 @@ function processReplay(data, submittedBy, matchType, scrimUid) {
 //////////////////////
 // NEW: Accept an optional mapIdToDisplay parameter
 function getReplayInfo(replayId, mapIdToDisplay) {
+  writeLog("getReplayInfo", "START", { replayId: replayId, mapIdToDisplay: mapIdToDisplay });
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tempSheet = ss.getSheetByName("Temp Submissions");
 
@@ -1033,6 +1079,7 @@ function getReplayInfo(replayId, mapIdToDisplay) {
 // data structure: { replayId: string, verifiedBy: string, scrimId: number }
 //////////////////////
 function verifyReplay(data) {
+  writeLog("verifyReplay", "START", { replayId: data.replayId, verifiedBy: data.verifiedBy, scrimId: data.scrimId });
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tempSheet = ss.getSheetByName("Temp Submissions");
 
@@ -1090,6 +1137,9 @@ function verifyReplay(data) {
       }
 
       var winningTeamNumber = cumulativeScores[1] > cumulativeScores[2] ? 1 : 2;
+      writeLog("verifyReplay", "CALCULATED_SCORES", { team1Points: cumulativeScores[1], team2Points: cumulativeScores[2], winningTeam: winningTeamNumber });
+      
+      writeLog("verifyReplay", "SAVE_TO_DB", "Calling Repository.saveMatchResults");
       var saveResult = Repository.saveMatchResults(
         data.scrimId,
         allParsedMaps,
@@ -1097,6 +1147,7 @@ function verifyReplay(data) {
       );
 
       if (saveResult.alreadyProcessed) {
+        writeLog("verifyReplay", "ALREADY_PROCESSED", "Match was already completed");
         return {
           success: true,
           message: "Match was already completed and Elo processed; no duplicate rows were written.",
@@ -1104,6 +1155,7 @@ function verifyReplay(data) {
       }
 
       Repository.awardEligibilityPoints(data.scrimId, 3);
+      writeLog("verifyReplay", "ELIGIBILITY_AWARDED", "Awarded 3 eligibility points");
 
       // Find the map with the most rounds again for the final success message
       let loggedMap = allParsedMaps.reduce((bestMap, currentMap) => {
@@ -1112,6 +1164,7 @@ function verifyReplay(data) {
           : bestMap;
       }, allParsedMaps[0]);
 
+      writeLog("verifyReplay", "SUCCESS", `Verified ${allParsedMaps.length} maps, winner: Team ${winningTeamNumber}`);
       return {
         success: true,
         message: `Verification successful! Data for ${allParsedMaps.length} map(s) saved to database. Match winner: Team ${winningTeamNumber}.`,

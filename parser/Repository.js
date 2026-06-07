@@ -6,7 +6,26 @@ var Repository = (function () {
   var SPROCKET_SCHEMA = "sprocket";
   var ELIGIBILITY_POINTS = 3;
 
+  function repositoryLog(method, stage, data) {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var logSheet = ss.getSheetByName("Logs");
+      if (!logSheet) {
+        logSheet = ss.insertSheet("Logs");
+        logSheet.appendRow(["Timestamp", "Method", "Stage", "Message", "Details"]);
+        logSheet.getRange(1, 1, 1, 5).setFontWeight("bold");
+        logSheet.setColumnWidths(1, 5, 200);
+        logSheet.setColumnWidth(5, 400);
+      }
+      var timestamp = new Date();
+      var details = typeof data === "object" ? JSON.stringify(data) : String(data);
+      var shortMsg = typeof data === "string" ? data : (data.message || data.error || "See Details");
+      logSheet.appendRow([timestamp, "Repository." + method, stage, shortMsg, details]);
+    } catch (e) {}
+  }
+
   function findTrackmaniaPlayer(conn, platformAccountId, fallbackDiscordUsername) {
+    repositoryLog("findTrackmaniaPlayer", "LOOKUP", { platformAccountId: platformAccountId, fallbackDiscordUsername: fallbackDiscordUsername });
     if (platformAccountId !== null && platformAccountId !== undefined && String(platformAccountId).trim() !== "") {
       var stmt = conn.prepareStatement(
         "SELECT lp.id, lp.sprocket_player_id " +
@@ -32,7 +51,10 @@ var Repository = (function () {
       }
       rs.close();
       stmt.close();
-      if (matches.length === 1) return matches[0];
+      if (matches.length === 1) {
+        repositoryLog("findTrackmaniaPlayer", "FOUND_PLATFORM", { localPlayerId: matches[0].localPlayerId, sprocketPlayerId: matches[0].sprocketPlayerId });
+        return matches[0];
+      }
       if (matches.length > 1) {
         throw new Error("Multiple Trackmania players resolved for platform account " + platformAccountId);
       }
@@ -100,6 +122,7 @@ var Repository = (function () {
    * @param {number} winnerTeam - 1 or 2
    */
   function saveMatchResults(scrimId, parsedMaps, winnerTeam) {
+    repositoryLog("saveMatchResults", "START", { scrimId: scrimId, mapCount: (Array.isArray(parsedMaps) ? parsedMaps.length : 1), winnerTeam: winnerTeam });
     var conn = Database.getConnection();
     conn.setAutoCommit(false);
 
@@ -194,9 +217,11 @@ var Repository = (function () {
       insertStats.close();
 
       conn.commit();
+      repositoryLog("saveMatchResults", "COMMITTED", { scrimId: scrimId, insertedStats: insertedStats });
       return { alreadyProcessed: false, insertedStats: insertedStats };
     } catch (e) {
       conn.rollback();
+      repositoryLog("saveMatchResults", "ERROR", e.message);
       Logger.log("Error saving match results: " + e.message);
       throw e;
     } finally {
