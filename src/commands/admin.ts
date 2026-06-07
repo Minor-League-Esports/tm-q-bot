@@ -100,6 +100,35 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand
+      .setName('link-tm')
+      .setDescription("Link a player's Trackmania account")
+      .addUserOption(option =>
+        option
+          .setName('player')
+          .setDescription('The player to link')
+          .setRequired(true)
+      )
+      .addStringOption(option =>
+        option
+          .setName('platform')
+          .setDescription('Gaming platform')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Steam', value: 'STEAM' },
+            { name: 'Epic', value: 'EPIC' },
+            { name: 'Xbox', value: 'XBOX' },
+            { name: 'PS4/PS5', value: 'PS4' }
+          )
+      )
+      .addStringOption(option =>
+        option
+          .setName('account-id')
+          .setDescription("Player's account ID (from Trackmania settings → Account)")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
       .setName('create-match')
       .setDescription('Create a scheduled match')
       .addStringOption((option) =>
@@ -579,7 +608,7 @@ async function handleLinkTm(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ ephemeral: true });
 
   const targetUser = interaction.options.getUser('player', true);
-  const platform = 'STEAM';
+  const platform = interaction.options.getString('platform', true);
   const accountId = interaction.options.getString('account-id', true).trim();
 
   const discordId = targetUser.id;

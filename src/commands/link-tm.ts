@@ -7,6 +7,18 @@ export const data = new SlashCommandBuilder()
   .setDescription('Link your Trackmania account to play scrims')
   .addStringOption((option) =>
     option
+      .setName('platform')
+      .setDescription('Your gaming platform')
+      .setRequired(true)
+      .addChoices(
+        { name: 'Steam', value: 'STEAM' },
+        { name: 'Epic', value: 'EPIC' },
+        { name: 'Xbox', value: 'XBOX' },
+        { name: 'PS4/PS5', value: 'PS4' }
+      )
+  )
+  .addStringOption((option) =>
+    option
       .setName('account-id')
       .setDescription('Your account ID (found in Trackmania settings → Account)')
       .setRequired(true),
@@ -14,7 +26,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   const discordId = interaction.user.id;
-  const platform = 'STEAM';
+  const platform = interaction.options.getString('platform')!;
   const accountId = interaction.options.getString('account-id')!.trim();
 
   try {
