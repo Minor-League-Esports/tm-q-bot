@@ -25,5 +25,5 @@ if (process.env.TEST_DATABASE_URL) {
 }
 
 if (!process.env.DATABASE_SCHEMA) {
-    process.env.DATABASE_SCHEMA = 'public';
+    process.env.DATABASE_SCHEMA = 'trackmania';
 }

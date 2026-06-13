@@ -8,6 +8,13 @@ function quoteIdentifier(identifier: string): string {
   return `"${identifier}"`;
 }
 
+function searchPathOption(schema: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+    throw new Error(`Invalid SQL identifier: ${schema}`);
+  }
+  return `-c search_path=${schema},public`;
+}
+
 export function tableName(table: string): string {
   return `${quoteIdentifier(config.database.schema)}.${quoteIdentifier(table)}`;
 }
@@ -19,6 +26,7 @@ export class Database {
     const isLocal = config.database.url.includes('localhost') || config.database.url.includes('127.0.0.1');
     this.pool = new Pool({
       connectionString: config.database.url,
+      options: searchPathOption(config.database.schema),
       ssl: isLocal ? false : {
         rejectUnauthorized: false,
       },
